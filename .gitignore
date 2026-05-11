@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# Environment files (contain secrets)
+backend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Temp files
+backend/tmp/
+/tmp/torrentstream/
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Concept notes (not needed in production)
+*.md
+!README.md
