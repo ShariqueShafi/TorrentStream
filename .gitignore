@@ -36,3 +36,10 @@ yarn-error.log*
 # Concept notes (not needed in production)
 *.md
 !README.md
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
