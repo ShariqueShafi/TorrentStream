@@ -47,3 +47,11 @@ yarn-error.log*
 # Deploy secrets
 .deploy/
 
+# Stitch Design & Metadata
+website design/
+*.txt
+!README.md
+!package.json
+!package-lock.json
+!frontend/public/*.png
+

@@ -4,7 +4,7 @@ import api from '../api';
 
 const API_BASE = api.defaults.baseURL;
 
-const HLSPlayer = ({ torrentId, fileIndex, fileName, onClose }) => {
+export default function HLSPlayer({ torrentId, fileIndex, fileName, onClose }) {
   const [status, setStatus] = useState('idle');
   const [streamUrl, setStreamUrl] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -85,7 +85,6 @@ const HLSPlayer = ({ torrentId, fileIndex, fileName, onClose }) => {
     }
   };
 
-  // Continue polling transcode progress after playback starts
   const startTranscodePoll = () => {
     const poll = async () => {
       try {
@@ -96,13 +95,10 @@ const HLSPlayer = ({ torrentId, fileIndex, fileName, onClose }) => {
         if (data.transcodeComplete) {
           setTranscodeComplete(true);
           setTranscodePercent(100);
-          // Transcode done! Playlist now has #EXT-X-ENDLIST.
-          // Reload the HLS source so hls.js sees the full VOD timeline.
           if (hlsRef.current) {
-            console.log('[Player] Transcode complete — reloading playlist for full timeline');
             hlsRef.current.loadSource(`${API_BASE}${data.hlsUrl}`);
           }
-          return; // Stop polling
+          return;
         }
         transcodePollTimer.current = setTimeout(poll, 5000);
       } catch {
@@ -121,7 +117,6 @@ const HLSPlayer = ({ torrentId, fileIndex, fileName, onClose }) => {
           maxBufferLength: 10,
           maxMaxBufferLength: 30,
           liveSyncDurationCount: 3,
-          // Enable live→VOD transition when ENDLIST appears
           liveDurationInfinity: false,
         });
         hlsRef.current = hls;
@@ -133,7 +128,6 @@ const HLSPlayer = ({ torrentId, fileIndex, fileName, onClose }) => {
         });
         hls.on(Hls.Events.ERROR, (event, data) => {
           if (data.fatal) {
-            console.error('[HLS] Fatal error:', data.type, data.details);
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
               hls.startLoad();
             }
@@ -149,91 +143,82 @@ const HLSPlayer = ({ torrentId, fileIndex, fileName, onClose }) => {
   }, [status, streamUrl]);
 
   return (
-    <div className="player-container">
-      {status === 'idle' && (
-        <div className="player-idle">
-          <div className="player-idle-icon pulse-anim">▶</div>
-          <div className="player-title">PREPARING STREAM</div>
-          <div className="player-subtitle">Connecting to backend...</div>
-        </div>
-      )}
-
-      {status === 'processing' && (
-        <div className="player-idle player-transcoding">
-          <div className="player-spinner"></div>
-          <div className="player-title" style={{ color: 'var(--accent)' }}>BUFFERING...</div>
-          {transcodePercent > 0 ? (
-            <div className="player-progress-bar" style={{ width: '300px' }}>
-              <div style={{
-                height: '100%',
-                width: `${transcodePercent}%`,
-                background: 'var(--accent)',
-                borderRadius: '2px',
-                transition: 'width 1s ease'
-              }} />
-            </div>
-          ) : (
-            <div className="player-progress-bar">
-              <div className="progress-indeterminate" style={{ height: '100%' }}></div>
+    <div className="flex flex-col gap-lg px-lg md:px-xl max-w-7xl mx-auto w-full mb-xl">
+      <section className="relative">
+        <div className="aspect-video bg-black border-4 border-border-primary shadow-[8px_8px_0px_#1A1A1A] flex items-center justify-center group overflow-hidden relative">
+          
+          {status === 'processing' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 text-white p-lg text-center">
+              <span className="material-symbols-outlined text-4xl animate-spin mb-md" style={{ fontVariationSettings: "'FILL' 1" }}>sync</span>
+              <h3 className="font-section-head text-section-head uppercase mb-sm">BUFFERING STREAM</h3>
+              <div className="w-full max-w-md h-4 border-2 border-white/30 relative mt-sm">
+                <div 
+                  className="absolute inset-y-0 left-0 bg-primary-fixed transition-all duration-300" 
+                  style={{ width: `${transcodePercent}%` }}
+                />
+              </div>
+              <p className="font-metadata text-metadata uppercase mt-sm text-white/70">
+                {transcodePercent > 0 
+                  ? `Transcoding chunk ${transcodePercent}%...` 
+                  : 'Downloading initial metadata from peers...'}
+              </p>
             </div>
           )}
-          <div className="player-subtitle">
-            {transcodePercent > 0 
-              ? `Transcoding: ${transcodePercent}% — playback will start soon.`
-              : 'Downloading from peers & preparing HLS stream.'}
+
+          {status === 'error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 text-status-error p-lg text-center">
+              <span className="material-symbols-outlined text-4xl mb-md">error</span>
+              <h3 className="font-section-head text-section-head uppercase mb-sm">STREAM ERROR</h3>
+              <p className="font-metadata text-metadata uppercase mb-md text-white/70">{errorMsg}</p>
+              <button 
+                onClick={startStream}
+                className="bg-status-error text-white font-bold px-lg py-sm border-2 border-border-primary neubrutal-shadow neubrutal-hover neubrutal-active"
+              >
+                RETRY CONNECTION
+              </button>
+            </div>
+          )}
+
+          <video 
+            ref={videoRef} 
+            controls 
+            className="w-full h-full object-contain z-10"
+            style={{ display: status === 'ready' ? 'block' : 'none' }}
+          />
+
+          {status === 'ready' && !transcodeComplete && (
+            <div className="absolute top-md right-md z-20 bg-status-warning text-black font-label-caps text-label-caps px-sm py-xs border-2 border-border-primary shadow-[2px_2px_0px_#1A1A1A] flex items-center gap-xs">
+              <span className="w-2 h-2 rounded-full bg-status-error animate-pulse"></span>
+              TRANSCODING LIVE: {transcodePercent}%
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="bg-white border-2 border-border-primary shadow-[4px_4px_0px_#1A1A1A] p-lg flex flex-col md:flex-row md:items-center justify-between gap-md">
+        <div className="flex flex-col gap-xs">
+          <div className="flex items-center gap-sm flex-wrap">
+            <h2 className="font-page-title text-card-title text-xl font-bold uppercase line-clamp-1" title={fileName}>
+              {fileName}
+            </h2>
+            <span className="bg-status-success/20 text-status-success border-2 border-status-success px-sm py-xs font-label-caps text-label-caps flex items-center gap-xs whitespace-nowrap">
+              STREAMING FROM R2
+              <span className="material-symbols-outlined text-[12px]">cloud</span>
+            </span>
           </div>
+          <p className="font-metadata text-metadata text-on-surface-variant">
+             Streaming via Cloudflare R2 Edge
+          </p>
         </div>
-      )}
-
-      {status === 'ready' && (
-        <video 
-          ref={videoRef} 
-          controls 
-          style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
-        />
-      )}
-
-      {status === 'error' && (
-        <div className="player-idle">
-          <div className="player-idle-icon" style={{ background: 'var(--error)' }}>⚠️</div>
-          <div className="player-title" style={{ color: 'var(--error)' }}>STREAM FAILED</div>
-          <div className="player-subtitle" style={{ marginBottom: 'var(--space-lg)' }}>{errorMsg}</div>
-          <button className="btn btn-secondary" onClick={startStream}>TRY AGAIN</button>
+        <div className="flex items-center gap-sm shrink-0">
+          <button 
+             className="bg-primary-container text-on-primary-fixed border-2 border-border-primary px-lg py-sm font-label-caps text-label-caps shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+             onClick={onClose}
+          >
+            CLOSE PLAYER
+          </button>
         </div>
-      )}
-      
-      {/* Close button */}
-      <button 
-        onClick={onClose}
-        style={{
-          position: 'absolute', top: '24px', right: '24px',
-          background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
-          color: '#fff', width: '36px', height: '36px', borderRadius: '50%',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 10, backdropFilter: 'blur(4px)'
-        }}
-      >✕</button>
-
-      {/* Now Playing + Transcode progress overlay */}
-      {status === 'ready' && (
-        <div style={{
-          position: 'absolute', top: '24px', left: '24px',
-          background: 'rgba(0,0,0,0.7)', border: '1px solid var(--border)',
-          padding: '8px 16px', borderRadius: 'var(--radius-md)',
-          backdropFilter: 'blur(4px)', zIndex: 10
-        }}>
-          <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 600, letterSpacing: '1px', marginBottom: '2px' }}>NOW PLAYING</div>
-          <div style={{ fontSize: '13px', fontWeight: 500, color: '#fff' }}>{fileName}</div>
-          {!transcodeComplete && (
-            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="pulse-anim" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }}></span>
-              Transcoding {transcodePercent}% — full timeline after completion
-            </div>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
-};
-
-export default HLSPlayer;
+}

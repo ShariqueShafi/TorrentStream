@@ -4,14 +4,13 @@ import FileBrowser from '../components/FileBrowser';
 import HLSPlayer from '../components/HLSPlayer';
 import { getTorrent } from '../api';
 
-export default function FileBrowserView() {
+export default function FileBrowserView({ isAdmin }) {
   const { torrentId } = useParams();
   const navigate = useNavigate();
   const [torrent, setTorrent] = useState(null);
   const [player, setPlayer] = useState({ fileIndex: null, fileName: '' });
 
   useEffect(() => {
-    // Fetch fresh torrent data on mount
     getTorrent(torrentId)
       .then((data) => setTorrent(data))
       .catch((err) => {
@@ -21,7 +20,7 @@ export default function FileBrowserView() {
   }, [torrentId, navigate]);
 
   if (!torrent) {
-    return <div style={{ color: 'var(--text-disabled)', padding: 'var(--space-xl)' }}>Loading torrent...</div>;
+    return <div className="text-text-disabled p-lg font-metadata">Loading torrent data...</div>;
   }
 
   const handlePlay = (tId, fileIndex, fileName) => {
@@ -29,27 +28,24 @@ export default function FileBrowserView() {
   };
 
   return (
-    <div className="fade-up fade-up-1">
-      <div 
-        style={{ cursor: 'pointer', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)', fontSize: '13px', fontWeight: 500 }} 
-        onClick={() => navigate('/')}
-      >
-        ← Home &gt; {torrent.name.substring(0, 30)}
-      </div>
-      
+    <div className="flex-grow flex flex-col w-full">
+      <nav className="flex items-center gap-xs font-metadata text-metadata uppercase tracking-widest text-text-secondary px-lg md:px-xl pt-lg pb-md">
+        <button onClick={() => navigate(-1)} className="hover:text-primary transition-colors cursor-pointer font-bold border-b border-transparent hover:border-primary">
+          Back
+        </button>
+        <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+        <span className="text-on-surface font-bold truncate">{torrent.name}</span>
+      </nav>
+
       {player.fileIndex !== null ? (
-        <div className="fade-up fade-up-2">
-          <HLSPlayer
-            torrentId={torrent.id}
-            fileIndex={player.fileIndex}
-            fileName={player.fileName}
-            onClose={() => setPlayer({ fileIndex: null, fileName: '' })}
-          />
-        </div>
+        <HLSPlayer
+          torrentId={torrent.id}
+          fileIndex={player.fileIndex}
+          fileName={player.fileName}
+          onClose={() => setPlayer({ fileIndex: null, fileName: '' })}
+        />
       ) : (
-        <div className="fade-up fade-up-2">
-          <FileBrowser torrent={torrent} onPlay={handlePlay} />
-        </div>
+        <FileBrowser torrent={torrent} onPlay={handlePlay} isAdmin={isAdmin} />
       )}
     </div>
   );

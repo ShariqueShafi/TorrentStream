@@ -20,64 +20,76 @@ const getFileIcon = (category) => {
   }
 };
 
-const FileBrowser = ({ torrent, onPlay }) => {
+export default function FileBrowser({ torrent, onPlay, isAdmin }) {
   if (!torrent) return null;
 
   const totalFiles = torrent.files ? torrent.files.length : 0;
 
   return (
-    <div>
-      <div className="file-browser-header">
-        <div className="file-browser-title-area">
-          <div className="file-browser-icon">🎬</div>
-          <div>
-            <div className="file-browser-title" title={torrent.name}>
-              {torrent.name.length > 50 ? torrent.name.substring(0, 50) + '...' : torrent.name}
+    <div className="flex-grow p-lg md:p-xl w-full max-w-[1200px] mx-auto">
+      {/* Torrent Header Card */}
+      <section className="bg-border-primary text-on-primary p-lg mb-xl border-2 border-border-primary shadow-[6px_6px_0px_#F5E642] relative overflow-hidden">
+        <div className="relative z-10">
+          <div className="flex flex-wrap items-center justify-between gap-md">
+            <div className="flex flex-col gap-xs">
+              <h1 className="font-page-title text-[32px] font-extrabold uppercase leading-none tracking-tighter">
+                {torrent.name || 'Unnamed Torrent'}
+              </h1>
+              <div className="flex items-center gap-md font-metadata text-metadata text-surface-variant">
+                <span>{totalFiles} files</span>
+                <span className="w-[4px] h-[4px] bg-primary-container rounded-full"></span>
+                <span>{formatSize(torrent.length)}</span>
+              </div>
             </div>
-            <div className="file-browser-meta">
-              {totalFiles} files • {formatSize(torrent.totalSize)}
+            <div className="bg-status-success text-on-primary font-label-caps text-label-caps px-md py-sm border-2 border-on-primary flex items-center gap-sm">
+              <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_done</span>
+              READY ON R2
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="file-list">
-        {torrent.files && torrent.files.map((file) => (
-          <div key={file.index} className="file-row">
-            <div className="file-row-icon">{getFileIcon(file.category)}</div>
-            
-            <div className="file-row-info">
-              <div className="file-row-name" title={file.name}>{file.name}</div>
-              <div className="file-row-meta">
-                {file.type.split('/')[1]?.toUpperCase() || 'UNKNOWN'} • {formatSize(file.size)}
+      {/* File Browser List */}
+      <div className="flex flex-col gap-md">
+        {torrent.files && torrent.files.map((file) => {
+          const extension = file.name.split('.').pop() || '';
+          return (
+            <div key={file.index} className="group flex flex-wrap items-center gap-md p-md bg-white border-2 border-border-primary shadow-[4px_4px_0px_#1A1A1A] hover:border-l-primary-fixed hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#1A1A1A] transition-all">
+              <div className="w-12 h-12 bg-primary-container border-2 border-border-primary flex items-center justify-center text-2xl">
+                {getFileIcon(file.category)}
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <h3 className="font-card-title text-card-title font-bold break-all" title={file.name}>
+                  {file.name}
+                </h3>
+                <p className="font-metadata text-metadata text-text-secondary mt-xs uppercase">
+                  {extension} · {formatSize(file.size)}
+                </p>
+              </div>
+              <div className="flex items-center gap-md ml-auto">
+                {file.category === 'video' && (
+                  <button 
+                    className="bg-primary-container border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+                    onClick={() => onPlay(torrent.id, file.index, file.name)}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">play_arrow</span>
+                    ▶ STREAM
+                  </button>
+                )}
+                <a 
+                  href={getDownloadUrl(torrent.id, file.index)} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+                >
+                  <span className="material-symbols-outlined text-[14px]">download</span>
+                  ↓ DL
+                </a>
               </div>
             </div>
-            
-            <div className="file-row-actions">
-              {file.category === 'video' && (
-                <button 
-                  className="btn btn-primary pulse-anim" 
-                  style={{ padding: '8px 20px', fontSize: '12px' }}
-                  onClick={() => onPlay(torrent.id, file.index, file.name)}
-                >
-                  ▶ STREAM
-                </button>
-              )}
-              <a 
-                href={getDownloadUrl(torrent.id, file.index)} 
-                target="_blank" 
-                rel="noreferrer"
-                className="btn btn-secondary"
-                style={{ textDecoration: 'none' }}
-              >
-                ⬇ DOWNLOAD
-              </a>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
-};
-
-export default FileBrowser;
+}

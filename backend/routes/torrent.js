@@ -7,10 +7,11 @@ import {
   getClientStats,
   formatTorrentInfo,
 } from '../torrentManager.js';
+import { authenticateToken } from '../auth.js';
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   const { magnet } = req.body;
   if (!magnet) return res.status(400).json({ error: 'Magnet link is required' });
   if (!magnet.startsWith('magnet:') && !magnet.startsWith('http')) {
@@ -46,7 +47,7 @@ router.get('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   const deleteFiles = req.query.keepFiles !== 'true';
   try {
     const result = await removeTorrent(req.params.id, deleteFiles);

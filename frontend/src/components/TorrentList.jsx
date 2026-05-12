@@ -8,59 +8,88 @@ const formatSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const TorrentList = ({ torrents, activeTorrentId, onSelect, onRemove }) => {
+export default function TorrentList({ torrents, onSelect, onRemove, isAdmin }) {
   return (
-    <div className="torrents-grid">
-      {torrents.map((torrent, index) => {
-        const fileCount = torrent.files ? torrent.files.length : 0;
-        const animationDelay = `fade-up-${(index % 4) + 1}`;
+    <section className="p-lg md:p-xl flex-grow">
+      <div className="max-w-[1200px] mx-auto">
+        <div className="flex items-center justify-between mb-lg">
+          <h3 className="font-section-head text-section-head uppercase border-l-4 border-primary pl-md">Active Torrents</h3>
+        </div>
         
-        return (
-          <div 
-            key={torrent.id} 
-            className={`torrent-card fade-up ${animationDelay}`}
-            onClick={() => onSelect(torrent)}
-          >
-            <div className="torrent-card-top">
-              🎬
-              <div className="torrent-card-badge">{fileCount} files</div>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-md">
+          {torrents.map((torrent) => {
+            const fileCount = torrent.files ? torrent.files.length : 0;
             
-            <div className="torrent-card-bottom">
-              <div className="torrent-card-title" title={torrent.name}>
-                {torrent.name}
+            return (
+              <div 
+                key={torrent.id} 
+                className="bg-bg-card border-2 border-border-primary neubrutal-shadow flex flex-col h-full hover:-translate-y-1 transition-transform cursor-pointer group"
+                onClick={() => onSelect(torrent)}
+              >
+                <div className="h-48 bg-primary-fixed border-b-2 border-border-primary flex items-center justify-center text-6xl relative overflow-hidden group-hover:bg-accent-hover transition-colors">
+                  <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#1A1A1A 1px, transparent 1px)', backgroundSize: '10px 10px' }}></div>
+                  <span>🎬</span>
+                  <div className="absolute top-sm right-sm bg-status-success text-on-primary border-2 border-border-primary px-xs py-[2px] font-metadata text-[10px] shadow-[2px_2px_0px_#1A1A1A]">
+                    READY
+                  </div>
+                </div>
+                
+                <div className="p-md flex flex-col flex-grow">
+                  <div className="flex justify-between items-start mb-sm gap-2">
+                    <h4 className="font-card-title text-card-title leading-tight line-clamp-2" title={torrent.name}>
+                      {torrent.name || 'Unnamed Torrent'}
+                    </h4>
+                    <span className="bg-surface-variant border border-border-primary px-xs font-metadata text-[9px] whitespace-nowrap mt-1">
+                      {fileCount} FILES
+                    </span>
+                  </div>
+                  
+                  <div className="mt-auto pt-md">
+                    <div className="flex justify-between font-metadata text-[10px] mb-1 uppercase text-text-secondary">
+                      <span>Size</span>
+                      <span>{formatSize(torrent.length)}</span>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <button 
+                        className="flex-grow bg-on-background text-on-primary font-bold py-sm flex items-center justify-center gap-sm border-2 border-border-primary neubrutal-shadow neubrutal-hover neubrutal-active"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelect(torrent);
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>folder_open</span>
+                        <span className="font-label-caps text-label-caps">BROWSE</span>
+                      </button>
+                      
+                      {isAdmin && (
+                        <button 
+                          className="bg-white text-status-error font-bold px-sm py-sm flex items-center justify-center border-2 border-border-primary neubrutal-shadow neubrutal-hover neubrutal-active"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Are you sure you want to completely remove this torrent from R2 storage?')) {
+                              onRemove(torrent.id);
+                            }
+                          }}
+                          title="Delete from R2"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="torrent-card-size">
-                {formatSize(torrent.totalSize)}
-              </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-md)' }}>
-                {torrent.ready ? (
-                  <div className="pill success">READY</div>
-                ) : (
-                  <div className="pill warning">LOCAL ONLY</div>
-                )}
+            );
+          })}
 
-                <button 
-                  className="btn-secondary" 
-                  style={{ border: 'none', padding: '4px' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm('Are you sure you want to remove this torrent?')) {
-                      onRemove(torrent.id);
-                    }
-                  }}
-                  title="Remove from list"
-                >
-                  🗑️
-                </button>
-              </div>
+          {torrents.length === 0 && (
+            <div className="col-span-full bg-surface-variant border-2 border-border-primary border-dashed flex flex-col h-full items-center justify-center p-xl opacity-60 min-h-[300px]">
+              <span className="material-symbols-outlined text-4xl mb-md">cloud_off</span>
+              <p className="font-metadata text-metadata uppercase text-center">Your archive is empty<br/>Add a magnet link to begin</p>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
-};
-
-export default TorrentList;
+}

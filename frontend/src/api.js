@@ -7,6 +7,14 @@ const api = axios.create({
   timeout: 120000,
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ts_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export async function addTorrent(magnet) {
   const res = await api.post('/api/torrent', { magnet });
   return res.data;

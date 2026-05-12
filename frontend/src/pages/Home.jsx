@@ -3,7 +3,7 @@ import TorrentInput from '../components/TorrentInput';
 import TorrentList from '../components/TorrentList';
 import { useNavigate } from 'react-router-dom';
 
-export default function Home({ torrents, onAddTorrent, onRemoveTorrent }) {
+export default function Home({ torrents, onAddTorrent, onRemoveTorrent, isAdmin }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -12,25 +12,19 @@ export default function Home({ torrents, onAddTorrent, onRemoveTorrent }) {
   };
 
   return (
-    <div className="fade-up fade-up-1">
-      <TorrentInput onLoaded={onAddTorrent} loading={loading} setLoading={setLoading} />
-
-      <div className="recent-header">RECENT TORRENTS</div>
-      
-      {torrents.length > 0 ? (
-        <TorrentList
-          torrents={torrents}
-          activeTorrentId={null}
-          onSelect={handleSelect}
-          onRemove={onRemoveTorrent}
-        />
-      ) : (
-        <div style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-xl)', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎬</div>
-          <div style={{ fontSize: '20px', fontFamily: 'var(--font-display)', letterSpacing: '1px' }}>YOUR ARCHIVE IS EMPTY</div>
-          <div style={{ fontSize: '14px' }}>Add a magnet link above to start streaming.</div>
-        </div>
-      )}
-    </div>
+    <>
+      <TorrentInput 
+        onLoaded={onAddTorrent} 
+        loading={loading} 
+        setLoading={setLoading} 
+        isAdmin={isAdmin}
+      />
+      <TorrentList
+        torrents={torrents}
+        onSelect={handleSelect}
+        onRemove={onRemoveTorrent}
+        isAdmin={isAdmin}
+      />
+    </>
   );
 }

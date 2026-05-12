@@ -7,7 +7,9 @@ dotenv.config();
 import torrentRoutes from './routes/torrent.js';
 import streamRoutes from './routes/stream.js';
 import downloadRoutes from './routes/download.js';
+import usageRoutes from './routes/usage.js';
 import { initTempStorage, startCleanupSweep, getHLSDir } from './tempStorage.js';
+import { generateToken, authenticateToken } from './auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,7 +27,7 @@ const CORS_ORIGIN = process.env.NODE_ENV === 'production'
 app.use(cors({
   origin: CORS_ORIGIN,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Range'],
+  allowedHeaders: ['Content-Type', 'Range', 'Authorization'],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
 }));
 app.use(express.json());
@@ -40,12 +42,26 @@ app.use((req, res, next) => {
 
 // ---- Routes ----
 
-// Torrent management
+// Auth
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASSWORD) {
+    const token = generateToken(username);
+    return res.json({ token, username });
+  }
+  res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// Torrent management (Protected for POST and DELETE)
+// We'll apply protection inside the router or here
 app.use('/api/torrent', torrentRoutes);
 app.use('/api/torrents', torrentRoutes);
 
 // Stream pipeline (start, status, session cleanup)
 app.use('/api/stream', streamRoutes);
+
+// Platform usage stats
+app.use('/api/usage', usageRoutes);
 
 // Download route (raw file download to user device)
 app.use('/download', downloadRoutes);
