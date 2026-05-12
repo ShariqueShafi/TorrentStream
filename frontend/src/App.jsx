@@ -104,17 +104,32 @@ export default function App() {
     return () => clearInterval(pollRef.current);
   }, []);
 
-  const handleAddTorrent = async (magnet) => {
-    try {
-      const info = await addTorrent(magnet);
-      setTorrents((prev) => {
-        const exists = prev.find((t) => t.id === info.id);
-        if (exists) return prev.map((t) => (t.id === info.id ? info : t));
-        return [...prev, info];
-      });
-      showToast(`Torrent loaded — ${info.files?.length || 0} files found`, 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || err.message || 'Could not load torrent', 'error');
+  const handleAddTorrent = async (input) => {
+    const lines = input.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return;
+
+    const results = await Promise.allSettled(lines.map(async (magnet) => {
+      try {
+        const info = await addTorrent(magnet);
+        setTorrents((prev) => {
+          const exists = prev.find((t) => t.id === info.id);
+          if (exists) return prev.map((t) => (t.id === info.id ? info : t));
+          return [...prev, info];
+        });
+        return { success: true, name: info.name || 'New Torrent' };
+      } catch (err) {
+        throw new Error(err.response?.data?.error || err.message || 'Could not load torrent');
+      }
+    }));
+
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+
+    if (successful > 0) {
+      showToast(`${successful} torrents added successfully`, 'success');
+    }
+    if (failed > 0) {
+      showToast(`${failed} torrents failed to load`, 'error');
     }
   };
 
@@ -170,7 +185,7 @@ export default function App() {
             />
             <Route 
               path="/files/:torrentId" 
-              element={<FileBrowserView isAdmin={isAdmin} />} 
+              element={<FileBrowserView torrents={torrents} isAdmin={isAdmin} />} 
             />
             <Route 
               path="/files" 
@@ -186,16 +201,26 @@ export default function App() {
 
       {/* Global Toasts */}
       {toasts.length > 0 && (
-        <div className="toast-container">
+        <div className="fixed bottom-lg right-lg z-[200] flex flex-col gap-md max-w-sm w-full">
           {toasts.map((toast) => (
-            <div key={toast.id} className={`toast toast-${toast.type}`}>
-              {toast.type === 'error' && <span>❌</span>}
-              {toast.type === 'success' && <span>✅</span>}
-              {toast.type === 'info' && <span>ℹ️</span>}
-              {toast.type === 'warning' && <span>⚠️</span>}
-              {toast.type === 'critical' && <span>🚨</span>}
-              {toast.type === 'exceeded' && <span>🛑</span>}
-              {toast.message}
+            <div 
+              key={toast.id} 
+              className={`flex items-center gap-md p-md border-2 border-border-primary neubrutal-shadow animate-in slide-in-from-right duration-300 ${
+                toast.type === 'error' || toast.type === 'critical' || toast.type === 'exceeded' 
+                  ? 'bg-status-error text-white' : 
+                toast.type === 'success' ? 'bg-status-success text-on-primary' : 
+                'bg-white text-text-primary'
+              }`}
+            >
+              <div className="w-8 h-8 bg-white border-2 border-border-primary flex items-center justify-center text-lg shrink-0">
+                {(toast.type === 'error' || toast.type === 'critical' || toast.type === 'exceeded') && '❌'}
+                {toast.type === 'success' && '✅'}
+                {toast.type === 'info' && 'ℹ️'}
+                {toast.type === 'warning' && '⚠️'}
+              </div>
+              <span className="font-metadata text-metadata uppercase font-bold tracking-tight leading-tight">
+                {toast.message}
+              </span>
             </div>
           ))}
         </div>

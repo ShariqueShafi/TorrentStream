@@ -23,13 +23,17 @@ export default function TorrentInput({ onLoaded, loading, setLoading, isAdmin })
         <form className="flex flex-col md:flex-row gap-md" onSubmit={handleSubmit}>
           <div className="flex-grow flex items-center bg-white border-2 border-border-primary neubrutal-shadow transition-all group focus-within:translate-x-[2px] focus-within:translate-y-[2px] focus-within:shadow-[1px_1px_0px_#1A1A1A]">
             <span className="material-symbols-outlined pl-md text-on-surface-variant">link</span>
-            <input
-              type="text"
-              className={`w-full p-md font-body-copy bg-transparent border-none outline-none focus:ring-0 ${!isAdmin ? 'cursor-not-allowed text-text-disabled' : 'text-text-primary'}`}
-              placeholder={isAdmin ? "magnet:?xt=urn:btih:..." : "Sign in as admin to add torrents..."}
+            <textarea
+              className={`w-full p-md font-body-copy bg-transparent border-none outline-none focus:ring-0 resize-none min-h-[48px] max-h-[150px] ${!isAdmin ? 'cursor-not-allowed text-text-disabled' : 'text-text-primary'}`}
+              placeholder={isAdmin ? "Paste magnet links (one per line)..." : "Sign in as admin to add torrents..."}
               value={magnet}
               onChange={(e) => setMagnet(e.target.value)}
               disabled={!isAdmin || loading}
+              rows="1"
+              onInput={(e) => {
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
             />
           </div>
           {isAdmin ? (

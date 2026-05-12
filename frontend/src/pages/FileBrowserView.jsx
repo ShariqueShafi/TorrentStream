@@ -4,23 +4,28 @@ import FileBrowser from '../components/FileBrowser';
 import HLSPlayer from '../components/HLSPlayer';
 import { getTorrent } from '../api';
 
-export default function FileBrowserView({ isAdmin }) {
+export default function FileBrowserView({ torrents, isAdmin }) {
   const { torrentId } = useParams();
   const navigate = useNavigate();
-  const [torrent, setTorrent] = useState(null);
   const [player, setPlayer] = useState({ fileIndex: null, fileName: '' });
 
-  useEffect(() => {
-    getTorrent(torrentId)
-      .then((data) => setTorrent(data))
-      .catch((err) => {
-        console.error(err);
-        navigate('/');
-      });
-  }, [torrentId, navigate]);
+  // Find the current torrent from the global polled state
+  const torrent = torrents.find(t => t.id === torrentId);
 
+  // If torrent doesn't exist in global state, it might be loading or gone
   if (!torrent) {
-    return <div className="text-text-disabled p-lg font-metadata">Loading torrent data...</div>;
+    return (
+      <div className="flex-grow flex items-center justify-center p-xl">
+        <div className="text-center animate-pulse">
+          <div className="w-16 h-16 bg-primary-fixed border-2 border-border-primary mb-md mx-auto flex items-center justify-center text-2xl">
+            📡
+          </div>
+          <p className="font-metadata text-metadata uppercase tracking-widest text-text-secondary">
+            Locating stream data...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const handlePlay = (tId, fileIndex, fileName) => {
