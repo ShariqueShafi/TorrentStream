@@ -12,7 +12,7 @@ import { initTempStorage, startCleanupSweep, getHLSDir } from './tempStorage.js'
 import { generateToken, authenticateToken } from './auth.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // Initialize temp storage on startup
 initTempStorage();
