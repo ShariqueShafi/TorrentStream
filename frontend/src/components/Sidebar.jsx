@@ -36,7 +36,7 @@ export default function Sidebar({ isOpen, onClose, isAdmin, onLoginClick, onLogo
               <span>
                 {usage?.cloudflare?.storage?.percent != null && !usage?.cloudflare?.storage?.error
                   ? `${usage.cloudflare.storage.percent}%`
-                  : '—'}
+                  : '0%'}
               </span>
             </div>
             <div className="h-4 bg-[#E8E8E8] border-2 border-border-primary relative overflow-hidden cursor-pointer" onClick={onRefreshUsage}>
@@ -49,16 +49,12 @@ export default function Sidebar({ isOpen, onClose, isAdmin, onLoginClick, onLogo
                   }`}
                   style={{ width: `${Math.min(usage.cloudflare.storage.percent, 100)}%` }}
                 />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-[9px] font-metadata text-text-secondary uppercase">
-                  Click to refresh
-                </div>
-              )}
+              ) : null}
             </div>
             <div className="text-[10px] font-metadata text-text-secondary text-right">
               {usage?.cloudflare?.storage?.usedGB != null && !usage?.cloudflare?.storage?.error
                 ? `${usage.cloudflare.storage.usedGB} GB / 10 GB`
-                : 'Server • Hosting • Cache'}
+                : '0 GB / 10 GB'}
             </div>
           </div>
         </div>
