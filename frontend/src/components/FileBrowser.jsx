@@ -83,21 +83,27 @@ export default function FileBrowser({ torrent, onPlay, isAdmin }) {
                 <div className="flex items-center gap-md ml-auto">
                   {file.category === 'video' && (
                     <button 
-                      className="bg-primary-container border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
-                      onClick={() => onPlay(torrent.id, file.index, file.name)}
+                      className={`bg-primary-container border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
+                        !torrent.ready ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none'
+                      }`}
+                      onClick={() => torrent.ready && onPlay(torrent.id, file.index, file.name)}
+                      disabled={!torrent.ready}
                     >
                       <span className="material-symbols-outlined text-[14px]">play_arrow</span>
-                      ▶ STREAM
+                      {torrent.ready ? '▶ STREAM' : 'WAIT...'}
                     </button>
                   )}
                   <a 
-                    href={getDownloadUrl(torrent.id, file.index)} 
-                    target="_blank" 
+                    href={torrent.ready ? getDownloadUrl(torrent.id, file.index) : '#'} 
+                    target={torrent.ready ? "_blank" : "_self"} 
                     rel="noreferrer"
-                    className="bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+                    className={`bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
+                      !torrent.ready ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none'
+                    }`}
+                    onClick={(e) => !torrent.ready && e.preventDefault()}
                   >
                     <span className="material-symbols-outlined text-[14px]">download</span>
-                    ↓ DL
+                    {torrent.ready ? '↓ DL' : 'WAIT...'}
                   </a>
                 </div>
               </div>

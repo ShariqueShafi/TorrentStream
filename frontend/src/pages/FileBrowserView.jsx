@@ -8,11 +8,22 @@ export default function FileBrowserView({ torrents, isAdmin }) {
   const { torrentId } = useParams();
   const navigate = useNavigate();
   const [player, setPlayer] = useState({ fileIndex: null, fileName: '' });
+  const [localTorrent, setLocalTorrent] = useState(null);
 
-  // Find the current torrent from the global polled state
-  const torrent = torrents.find(t => t.id === torrentId);
+  // Find from global state first (polled live)
+  const torrent = torrents.find(t => t.id === torrentId) || localTorrent;
 
-  // If torrent doesn't exist in global state, it might be loading or gone
+  useEffect(() => {
+    // If not in global state, fetch it specifically once
+    if (!torrent) {
+      getTorrent(torrentId)
+        .then(data => setLocalTorrent(data))
+        .catch(() => {
+          // If poll also fails, then we might be in trouble
+        });
+    }
+  }, [torrentId, torrent]);
+
   if (!torrent) {
     return (
       <div className="flex-grow flex items-center justify-center p-xl">
