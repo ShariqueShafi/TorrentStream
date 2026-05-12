@@ -27,9 +27,6 @@ export async function removeTorrent(id, keepFiles = false) {
   return res.data;
 }
 
-export function getStreamUrl(torrentId, fileIndex) {
-  return `${API_BASE}/api/stream/${torrentId}/${fileIndex}`;
-}
 
 export function getDownloadUrl(torrentId, fileIndex) {
   return `${API_BASE}/download/${torrentId}/${fileIndex}`;

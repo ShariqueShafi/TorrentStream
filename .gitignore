@@ -43,3 +43,7 @@ yarn-error.log*
 !.dev.vars.example
 .env*
 !.env.example
+
+# Deploy secrets
+.deploy/
+

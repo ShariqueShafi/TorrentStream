@@ -92,27 +92,35 @@ export function addTorrent(magnetOrUrl) {
       }
     }
 
-    const timeout = setTimeout(() => {
-      reject(new Error('Torrent metadata fetch timed out after 60 seconds'));
-    }, 60000);
-
     try {
-      client.add(magnetOrUrl, { path: TORRENT_PATH }, (torrent) => {
-        clearTimeout(timeout);
-        activeTorrents.set(torrent.infoHash, torrent);
+      const torrent = client.add(magnetOrUrl, { path: TORRENT_PATH });
+      
+      // Store it immediately so listTorrents can see it
+      activeTorrents.set(torrent.infoHash, torrent);
+      
+      // Deselect files when it eventually becomes ready
+      torrent.on('ready', () => {
         torrent.files.forEach((file) => file.deselect());
-        console.log(`[TorrentManager] Added: ${torrent.name} (${torrent.infoHash})`);
-        resolve(formatTorrentInfo(torrent));
+        console.log(`[TorrentManager] Ready: ${torrent.name} (${torrent.infoHash})`);
       });
+
+      // Resolve immediately, don't wait for metadata (prevents Cloudflare 522 timeouts)
+      resolve(formatTorrentInfo(torrent));
+
     } catch (err) {
-      clearTimeout(timeout);
+      // WebTorrent throws synchronously if a duplicate infoHash is added
+      if (err.message.includes('duplicate')) {
+        const hashMatch = err.message.match(/duplicate torrent ([a-f0-9]+)/i);
+        if (hashMatch && hashMatch[1]) {
+           const existing = activeTorrents.get(hashMatch[1]) || client.get(hashMatch[1]);
+           if (existing) {
+             activeTorrents.set(existing.infoHash, existing);
+             return resolve(formatTorrentInfo(existing));
+           }
+        }
+      }
       reject(err);
     }
-
-    client.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
   });
 }
 
@@ -134,12 +142,17 @@ export function removeTorrent(infoHash, deleteFiles = true) {
     if (!torrent) return reject(new Error('Torrent not found'));
 
     const name = torrent.name;
+    
+    // Remove from our active registry immediately so UI reflects it
+    activeTorrents.delete(infoHash);
+    
+    // Destroy in background (can hang if metadata is fetching)
     torrent.destroy({ destroyStore: deleteFiles }, (err) => {
-      if (err) return reject(err);
-      activeTorrents.delete(infoHash);
-      console.log(`[TorrentManager] Removed: ${name} (${infoHash})`);
-      resolve({ success: true, id: infoHash });
+      if (err) console.error(`[TorrentManager] Error removing ${infoHash}:`, err);
+      else console.log(`[TorrentManager] Removed: ${name} (${infoHash})`);
     });
+
+    resolve({ success: true, id: infoHash });
   });
 }
 

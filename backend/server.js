@@ -18,8 +18,12 @@ initTempStorage();
 // Start background cleanup sweep (removes stale sessions every 5min)
 startCleanupSweep();
 
+const CORS_ORIGIN = process.env.NODE_ENV === 'production'
+  ? 'https://shamstailors.com'
+  : '*';
+
 app.use(cors({
-  origin: '*',
+  origin: CORS_ORIGIN,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Range'],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],

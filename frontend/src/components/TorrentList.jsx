@@ -36,7 +36,7 @@ const TorrentList = ({ torrents, activeTorrentId, onSelect, onRemove }) => {
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-md)' }}>
                 {torrent.ready ? (
-                  <div className="pill success">READY ON R2</div>
+                  <div className="pill success">READY</div>
                 ) : (
                   <div className="pill warning">LOCAL ONLY</div>
                 )}
