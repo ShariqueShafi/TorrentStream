@@ -104,19 +104,35 @@ export default function App() {
     return () => clearInterval(pollRef.current);
   }, []);
 
-  const handleAddTorrent = async (magnet) => {
-    try {
-      const info = await addTorrent(magnet);
-      setTorrents((prev) => {
-        const exists = prev.find((t) => t.id === info.id);
-        if (exists) return prev.map((t) => (t.id === info.id ? info : t));
-        return [...prev, info];
-      });
-      showToast(`Torrent loaded — ${info.files?.length || 0} files found`, 'success');
-    } catch (err) {
-      showToast(err.response?.data?.error || err.message || 'Could not load torrent', 'error');
+  const handleAddTorrent = async (input) => {
+    const lines = input.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return;
+
+    const results = await Promise.allSettled(lines.map(async (magnet) => {
+      try {
+        const info = await addTorrent(magnet);
+        setTorrents((prev) => {
+          const exists = prev.find((t) => t.id === info.id);
+          if (exists) return prev.map((t) => (t.id === info.id ? info : t));
+          return [...prev, info];
+        });
+        return { success: true, name: info.name || 'New Torrent' };
+      } catch (err) {
+        throw new Error(err.response?.data?.error || err.message || 'Could not load torrent');
+      }
+    }));
+
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+
+    if (successful > 0) {
+      showToast(`${successful} torrents added successfully`, 'success');
+    }
+    if (failed > 0) {
+      showToast(`${failed} torrents failed to load`, 'error');
     }
   };
+
 
   const handleRemoveTorrent = async (id) => {
     try {
@@ -170,8 +186,9 @@ export default function App() {
             />
             <Route 
               path="/files/:torrentId" 
-              element={<FileBrowserView isAdmin={isAdmin} />} 
+              element={<FileBrowserView torrents={torrents} isAdmin={isAdmin} />} 
             />
+
             <Route 
               path="/files" 
               element={<MyFiles torrents={torrents} onRemoveTorrent={handleRemoveTorrent} isAdmin={isAdmin} />} 

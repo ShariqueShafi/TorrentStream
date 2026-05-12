@@ -4,23 +4,39 @@ import FileBrowser from '../components/FileBrowser';
 import HLSPlayer from '../components/HLSPlayer';
 import { getTorrent } from '../api';
 
-export default function FileBrowserView({ isAdmin }) {
+export default function FileBrowserView({ torrents, isAdmin }) {
   const { torrentId } = useParams();
   const navigate = useNavigate();
-  const [torrent, setTorrent] = useState(null);
   const [player, setPlayer] = useState({ fileIndex: null, fileName: '' });
+  const [localTorrent, setLocalTorrent] = useState(null);
+
+  // Find from global state first (polled live)
+  const torrent = torrents.find(t => t.id === torrentId) || localTorrent;
 
   useEffect(() => {
-    getTorrent(torrentId)
-      .then((data) => setTorrent(data))
-      .catch((err) => {
-        console.error(err);
-        navigate('/');
-      });
-  }, [torrentId, navigate]);
+    // If not in global state, fetch it specifically once
+    if (!torrent) {
+      getTorrent(torrentId)
+        .then(data => setLocalTorrent(data))
+        .catch(() => {
+          // If poll also fails, then we might be in trouble
+        });
+    }
+  }, [torrentId, torrent]);
 
   if (!torrent) {
-    return <div className="text-text-disabled p-lg font-metadata">Loading torrent data...</div>;
+    return (
+      <div className="flex-grow flex items-center justify-center p-xl">
+        <div className="text-center animate-pulse">
+          <div className="w-16 h-16 bg-primary-fixed border-2 border-border-primary mb-md mx-auto flex items-center justify-center text-2xl">
+            📡
+          </div>
+          <p className="font-metadata text-metadata uppercase tracking-widest text-text-secondary">
+            Locating stream data...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const handlePlay = (tId, fileIndex, fileName) => {
@@ -50,3 +66,4 @@ export default function FileBrowserView({ isAdmin }) {
     </div>
   );
 }
+

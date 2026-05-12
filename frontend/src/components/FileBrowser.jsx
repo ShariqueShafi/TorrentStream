@@ -38,58 +38,80 @@ export default function FileBrowser({ torrent, onPlay, isAdmin }) {
               <div className="flex items-center gap-md font-metadata text-metadata text-surface-variant">
                 <span>{totalFiles} files</span>
                 <span className="w-[4px] h-[4px] bg-primary-container rounded-full"></span>
-                <span>{formatSize(torrent.length)}</span>
+                <span>{formatSize(torrent.totalSize)}</span>
               </div>
             </div>
-            <div className="bg-status-success text-on-primary font-label-caps text-label-caps px-md py-sm border-2 border-on-primary flex items-center gap-sm">
-              <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_done</span>
-              READY ON R2
-            </div>
+            {torrent.ready ? (
+              <div className="bg-status-success text-on-primary font-label-caps text-label-caps px-md py-sm border-2 border-on-primary flex items-center gap-sm">
+                <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_done</span>
+                READY ON R2
+              </div>
+            ) : (
+              <div className="bg-primary-fixed text-on-background font-label-caps text-label-caps px-md py-sm border-2 border-border-primary flex items-center gap-sm animate-pulse">
+                <span className="material-symbols-outlined text-[16px] animate-spin">refresh</span>
+                FETCHING METADATA
+              </div>
+            )}
           </div>
         </div>
       </section>
 
       {/* File Browser List */}
       <div className="flex flex-col gap-md">
-        {torrent.files && torrent.files.map((file) => {
-          const extension = file.name.split('.').pop() || '';
-          return (
-            <div key={file.index} className="group flex flex-wrap items-center gap-md p-md bg-white border-2 border-border-primary shadow-[4px_4px_0px_#1A1A1A] hover:border-l-primary-fixed hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#1A1A1A] transition-all">
-              <div className="w-12 h-12 bg-primary-container border-2 border-border-primary flex items-center justify-center text-2xl">
-                {getFileIcon(file.category)}
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <h3 className="font-card-title text-card-title font-bold break-all" title={file.name}>
-                  {file.name}
-                </h3>
-                <p className="font-metadata text-metadata text-text-secondary mt-xs uppercase">
-                  {extension} · {formatSize(file.size)}
-                </p>
-              </div>
-              <div className="flex items-center gap-md ml-auto">
-                {file.category === 'video' && (
-                  <button 
-                    className="bg-primary-container border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
-                    onClick={() => onPlay(torrent.id, file.index, file.name)}
+        {(!torrent.files || torrent.files.length === 0) ? (
+          <div className="bg-white border-2 border-border-primary p-2xl text-center shadow-[4px_4px_0px_#1A1A1A]">
+            <div className="text-4xl mb-md">🛰️</div>
+            <h3 className="font-section-head text-section-head uppercase font-black">Waiting for metadata</h3>
+            <p className="font-body-copy text-text-secondary mt-sm">This usually takes a few seconds once peers are found.</p>
+          </div>
+        ) : (
+          torrent.files.map((file) => {
+            const extension = file.name.split('.').pop() || '';
+            return (
+              <div key={file.index} className="group flex flex-wrap items-center gap-md p-md bg-white border-2 border-border-primary shadow-[4px_4px_0px_#1A1A1A] hover:border-l-primary-fixed hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#1A1A1A] transition-all">
+                <div className="w-12 h-12 bg-primary-container border-2 border-border-primary flex items-center justify-center text-2xl">
+                  {getFileIcon(file.category)}
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <h3 className="font-card-title text-card-title font-bold break-all" title={file.name}>
+                    {file.name}
+                  </h3>
+                  <p className="font-metadata text-metadata text-text-secondary mt-xs uppercase">
+                    {extension} · {formatSize(file.size)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-md ml-auto">
+                  {file.category === 'video' && (
+                    <button 
+                      className={`bg-primary-container border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
+                        !torrent.ready ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none'
+                      }`}
+                      onClick={() => torrent.ready && onPlay(torrent.id, file.index, file.name)}
+                      disabled={!torrent.ready}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">play_arrow</span>
+                      {torrent.ready ? '▶ STREAM' : 'WAIT...'}
+                    </button>
+                  )}
+                  <a 
+                    href={torrent.ready ? getDownloadUrl(torrent.id, file.index) : '#'} 
+                    target={torrent.ready ? "_blank" : "_self"} 
+                    rel="noreferrer"
+                    className={`bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
+                      !torrent.ready ? 'opacity-50 cursor-not-allowed' : 'hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none'
+                    }`}
+                    onClick={(e) => !torrent.ready && e.preventDefault()}
                   >
-                    <span className="material-symbols-outlined text-[14px]">play_arrow</span>
-                    ▶ STREAM
-                  </button>
-                )}
-                <a 
-                  href={getDownloadUrl(torrent.id, file.index)} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
-                >
-                  <span className="material-symbols-outlined text-[14px]">download</span>
-                  ↓ DL
-                </a>
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    {torrent.ready ? '↓ DL' : 'WAIT...'}
+                  </a>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
+
