@@ -28,26 +28,40 @@ export default function Sidebar({ isOpen, onClose, isAdmin, onLoginClick, onLogo
           </NavLink>
         </nav>
 
-        {/* R2 Storage Indicator */}
-        {usage?.cloudflare?.storage && (
-          <div className="mt-auto border-t-2 border-border-primary pt-md">
-            <div className="flex flex-col gap-xs">
-              <div className="flex justify-between font-metadata text-metadata uppercase mb-1">
-                <span>R2 Storage</span>
-                <span>{usage.cloudflare.storage.percent}%</span>
-              </div>
-              <div className="h-4 bg-[#E8E8E8] border-2 border-border-primary relative overflow-hidden cursor-pointer" onClick={onRefreshUsage}>
+        {/* Cloudflare Account Storage */}
+        <div className="mt-auto border-t-2 border-border-primary pt-md">
+          <div className="flex flex-col gap-xs">
+            <div className="flex justify-between font-metadata text-metadata uppercase mb-1">
+              <span>Account Storage</span>
+              <span>
+                {usage?.cloudflare?.storage?.percent != null && !usage?.cloudflare?.storage?.error
+                  ? `${usage.cloudflare.storage.percent}%`
+                  : '—'}
+              </span>
+            </div>
+            <div className="h-4 bg-[#E8E8E8] border-2 border-border-primary relative overflow-hidden cursor-pointer" onClick={onRefreshUsage}>
+              {usage?.cloudflare?.storage?.percent != null && !usage?.cloudflare?.storage?.error ? (
                 <div 
-                  className={`absolute inset-y-0 left-0 border-r-2 border-border-primary transition-all duration-500 ${usage.cloudflare.storage.status === 'safe' ? 'bg-status-success' : 'bg-status-warning'}`}
+                  className={`absolute inset-y-0 left-0 border-r-2 border-border-primary transition-all duration-500 ${
+                    usage.cloudflare.storage.status === 'safe' ? 'bg-status-success' 
+                    : usage.cloudflare.storage.status === 'warning' ? 'bg-status-warning' 
+                    : 'bg-status-error'
+                  }`}
                   style={{ width: `${Math.min(usage.cloudflare.storage.percent, 100)}%` }}
                 />
-              </div>
-              <div className="text-[10px] font-metadata text-text-secondary text-right">
-                {usage.cloudflare.storage.usedGB} GB / {usage.cloudflare.storage.limitGB} GB
-              </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-[9px] font-metadata text-text-secondary uppercase">
+                  Click to refresh
+                </div>
+              )}
+            </div>
+            <div className="text-[10px] font-metadata text-text-secondary text-right">
+              {usage?.cloudflare?.storage?.usedGB != null && !usage?.cloudflare?.storage?.error
+                ? `${usage.cloudflare.storage.usedGB} GB / 10 GB`
+                : 'Server • Hosting • Cache'}
             </div>
           </div>
-        )}
+        </div>
       </aside>
 
       {/* Mobile Bottom Nav Bar */}

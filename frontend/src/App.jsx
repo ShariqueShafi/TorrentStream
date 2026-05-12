@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import Topbar from './components/Topbar';
 import Sidebar from './components/Sidebar';
 import LoginModal from './components/LoginModal';
+import LogoutModal from './components/LogoutModal';
 import PlatformUsageBanners from './components/PlatformUsageBanners';
 import Home from './pages/Home';
 import FileBrowserView from './pages/FileBrowserView';
@@ -21,6 +22,7 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('ts_admin') === '1');
   const pollRef = useRef(null);
 
@@ -53,12 +55,10 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Are you sure you want to sign out?')) {
-      setIsAdmin(false);
-      localStorage.removeItem('ts_admin');
-      localStorage.removeItem('ts_token');
-      showToast('Signed out', 'info');
-    }
+    setIsAdmin(false);
+    localStorage.removeItem('ts_admin');
+    localStorage.removeItem('ts_token');
+    showToast('Signed out', 'info');
   };
 
   const showToast = useCallback((message, type = 'info') => {
@@ -134,7 +134,7 @@ export default function App() {
         onMenuClick={() => setIsSidebarOpen(prev => !prev)} 
         isAdmin={isAdmin} 
         onLoginClick={() => setIsLoginModalOpen(true)} 
-        onLogoutClick={handleLogout} 
+        onLogoutClick={() => setIsLogoutModalOpen(true)} 
       />
       
       <Sidebar 
@@ -142,7 +142,7 @@ export default function App() {
         onClose={() => setIsSidebarOpen(false)} 
         isAdmin={isAdmin} 
         onLoginClick={() => setIsLoginModalOpen(true)} 
-        onLogoutClick={handleLogout} 
+        onLogoutClick={() => setIsLogoutModalOpen(true)} 
         usage={usage} 
         onRefreshUsage={refetch} 
       />
@@ -151,6 +151,12 @@ export default function App() {
         isOpen={isLoginModalOpen} 
         onClose={() => setIsLoginModalOpen(false)} 
         onLogin={handleLogin} 
+      />
+
+      <LogoutModal 
+        isOpen={isLogoutModalOpen} 
+        onClose={() => setIsLogoutModalOpen(false)} 
+        onConfirm={handleLogout} 
       />
 
       <main className={`${isSidebarOpen ? 'md:ml-[260px]' : 'md:ml-0'} transition-all duration-300 pt-[52px] pb-[72px] md:pb-0 min-h-screen flex flex-col`}>
