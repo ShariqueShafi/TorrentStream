@@ -13,7 +13,7 @@ export default function Topbar({ onMenuClick, isAdmin, onLoginClick, onLogoutCli
             menu
           </button>
           <NavLink to="/" className="font-page-title text-page-title font-bold text-on-surface dark:text-primary-fixed flex items-center gap-2 uppercase tracking-tighter">
-            <img src="/logo.png" alt="TorrentStream" className="h-7 w-7 object-contain" />
+            <img src="/logo.png" alt="TorrentStream" className="h-9 w-9 object-contain" />
             TORRENTSTREAM
           </NavLink>
         </div>
