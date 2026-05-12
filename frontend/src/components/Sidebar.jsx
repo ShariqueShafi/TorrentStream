@@ -1,8 +1,51 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
+function UsageBar({ label, data }) {
+  if (!data || data.error) return null;
+  
+  const formatValue = (val, unit) => {
+    if (unit === 'ops' || unit === 'reqs/day' || unit === 'builds') {
+      if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+      if (val >= 1000) return `${(val / 1000).toFixed(0)}K`;
+      return val.toString();
+    }
+    return val.toString();
+  };
+
+  const formatLimit = (val, unit) => {
+    if (unit === 'ops' || unit === 'reqs/day' || unit === 'builds') {
+      if (val >= 1000000) return `${(val / 1000000).toFixed(0)}M`;
+      if (val >= 1000) return `${(val / 1000).toFixed(0)}K`;
+      return val.toString();
+    }
+    return val.toString();
+  };
+
+  const barColor = data.status === 'safe' ? 'bg-status-success'
+    : data.status === 'warning' ? 'bg-status-warning'
+    : 'bg-status-error';
+
+  return (
+    <div className="flex flex-col gap-[2px]">
+      <div className="flex justify-between font-metadata text-[9px] uppercase">
+        <span className="truncate">{label}</span>
+        <span className="whitespace-nowrap ml-1">{data.percent}%</span>
+      </div>
+      <div className="h-[10px] bg-[#E8E8E8] border border-border-primary relative overflow-hidden">
+        <div 
+          className={`absolute inset-y-0 left-0 transition-all duration-500 ${barColor}`}
+          style={{ width: `${Math.min(data.percent, 100)}%` }}
+        />
+      </div>
+      <div className="text-[8px] font-metadata text-text-secondary text-right">
+        {formatValue(data.used, data.unit)} / {formatLimit(data.limit, data.unit)} {data.unit === 'GB' || data.unit === 'hrs' ? data.unit : ''}
+      </div>
+    </div>
+  );
+}
+
 export default function Sidebar({ isOpen, onClose, isAdmin, onLoginClick, onLogoutClick, usage, onRefreshUsage }) {
-  // Mobile Nav is separate, but we render both here for layout simplicity
   return (
     <>
       {/* Mobile Overlay */}
@@ -11,7 +54,7 @@ export default function Sidebar({ isOpen, onClose, isAdmin, onLoginClick, onLogo
       )}
 
       {/* Desktop & Mobile Sidebar */}
-      <aside className={`${isOpen ? 'flex' : 'hidden'} fixed left-0 top-0 h-full w-[260px] bg-surface dark:bg-background border-r-2 border-border-primary flex-col gap-md p-lg z-40 shadow-[5px_0_0_0_#1A1A1A] pt-[72px] transition-all duration-300`}>
+      <aside className={`${isOpen ? 'flex' : 'hidden'} fixed left-0 top-0 h-full w-[260px] bg-surface dark:bg-background border-r-2 border-border-primary flex-col gap-md p-lg z-40 shadow-[5px_0_0_0_#1A1A1A] pt-[72px] transition-all duration-300 overflow-y-auto`}>
         <div className="mb-lg">
           <h2 className="font-section-head text-section-head uppercase text-primary mb-md">
             NAVIGATION
@@ -28,34 +71,37 @@ export default function Sidebar({ isOpen, onClose, isAdmin, onLoginClick, onLogo
           </NavLink>
         </nav>
 
-        {/* Cloudflare Account Storage */}
-        <div className="mt-auto border-t-2 border-border-primary pt-md">
-          <div className="flex flex-col gap-xs">
-            <div className="flex justify-between font-metadata text-metadata uppercase mb-1">
-              <span>Account Storage</span>
-              <span>
-                {usage?.cloudflare?.storage?.percent != null && !usage?.cloudflare?.storage?.error
-                  ? `${usage.cloudflare.storage.percent}%`
-                  : '0%'}
-              </span>
+        {/* Usage Section */}
+        <div className="mt-auto border-t-2 border-border-primary pt-md flex flex-col gap-md cursor-pointer" onClick={onRefreshUsage}>
+          
+          {/* Google Cloud Section */}
+          <div>
+            <div className="font-metadata text-[9px] uppercase text-primary font-bold mb-xs tracking-widest flex items-center gap-1">
+              <span className="text-[10px]">☁️</span> Google Cloud
             </div>
-            <div className="h-4 bg-[#E8E8E8] border-2 border-border-primary relative overflow-hidden cursor-pointer" onClick={onRefreshUsage}>
-              {usage?.cloudflare?.storage?.percent != null && !usage?.cloudflare?.storage?.error ? (
-                <div 
-                  className={`absolute inset-y-0 left-0 border-r-2 border-border-primary transition-all duration-500 ${
-                    usage.cloudflare.storage.status === 'safe' ? 'bg-status-success' 
-                    : usage.cloudflare.storage.status === 'warning' ? 'bg-status-warning' 
-                    : 'bg-status-error'
-                  }`}
-                  style={{ width: `${Math.min(usage.cloudflare.storage.percent, 100)}%` }}
-                />
-              ) : null}
+            <div className="flex flex-col gap-sm">
+              <UsageBar label="VM Hours" data={usage?.gcp?.vmHours} />
+              <UsageBar label="Disk" data={usage?.gcp?.disk} />
+              <UsageBar label="Egress" data={usage?.gcp?.egress} />
             </div>
-            <div className="text-[10px] font-metadata text-text-secondary text-right">
-              {usage?.cloudflare?.storage?.usedGB != null && !usage?.cloudflare?.storage?.error
-                ? `${usage.cloudflare.storage.usedGB} GB / 10 GB`
-                : '0 GB / 10 GB'}
+          </div>
+
+          {/* Cloudflare Section */}
+          <div>
+            <div className="font-metadata text-[9px] uppercase text-primary font-bold mb-xs tracking-widest flex items-center gap-1">
+              <span className="text-[10px]">🔶</span> Cloudflare
             </div>
+            <div className="flex flex-col gap-sm">
+              <UsageBar label="R2 Storage" data={usage?.cloudflare?.r2Storage} />
+              <UsageBar label="R2 Writes" data={usage?.cloudflare?.r2ClassA} />
+              <UsageBar label="R2 Reads" data={usage?.cloudflare?.r2ClassB} />
+              <UsageBar label="Pages Builds" data={usage?.cloudflare?.pagesBuilds} />
+              <UsageBar label="Workers Reqs" data={usage?.cloudflare?.workersRequests} />
+            </div>
+          </div>
+
+          <div className="text-[8px] font-metadata text-text-secondary text-center uppercase tracking-widest">
+            Free tier limits • Click to refresh
           </div>
         </div>
       </aside>

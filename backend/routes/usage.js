@@ -1,5 +1,6 @@
 import express from 'express';
 import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { execSync } from 'child_process';
 import fs from 'fs';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -18,12 +19,99 @@ const r2Client = new S3Client({
 
 router.get('/', async (req, res) => {
   const usage = {
-    cloudflare: { storage: null, requests: null },
-    render:     { hours: null }, // Mapped to GCP VM Uptime instead
-    timestamp:  new Date().toISOString(),
+    gcp: {
+      vmHours: null,
+      disk: null,
+      egress: null,
+    },
+    cloudflare: {
+      r2Storage: null,
+      r2ClassA: null,
+      r2ClassB: null,
+      pagesBuilds: null,
+      workersRequests: null,
+    },
+    timestamp: new Date().toISOString(),
   };
 
-  // 1. Cloudflare R2 Storage
+  // ──── GOOGLE CLOUD ────
+
+  // 1. GCP VM Uptime (free: 744 hours/month for e2-micro)
+  try {
+    const serverStartTime  = global.serverStartTime || Date.now();
+    global.serverStartTime = serverStartTime;
+
+    const uptimeMs    = Date.now() - serverStartTime;
+    const uptimeHours = parseFloat((uptimeMs / 3600000).toFixed(2));
+
+    // Accumulate across restarts
+    const uptimePath = '/tmp/gcp_uptime.json';
+    let uptimeData = { hours: 0, resetMonth: new Date().getMonth() };
+    if (fs.existsSync(uptimePath)) {
+      uptimeData = JSON.parse(fs.readFileSync(uptimePath, 'utf8'));
+      if (uptimeData.resetMonth !== new Date().getMonth()) {
+        uptimeData = { hours: 0, resetMonth: new Date().getMonth() };
+      }
+    }
+
+    const totalHours = parseFloat((uptimeData.hours + uptimeHours).toFixed(2));
+    const limitHours = 744; // ~31 days
+    const percent    = parseFloat(((totalHours / limitHours) * 100).toFixed(1));
+    const status     = percent >= 100 ? 'exceeded'
+                     : percent >= 90  ? 'critical'
+                     : percent >= 80  ? 'warning'
+                     : 'safe';
+
+    usage.gcp.vmHours = { used: totalHours, limit: limitHours, percent, status, unit: 'hrs' };
+  } catch (err) {
+    usage.gcp.vmHours = { error: err.message };
+  }
+
+  // 2. GCP Disk Usage (free: 30 GB standard persistent disk)
+  try {
+    const dfOut = execSync("df -BG / | tail -1 | awk '{print $3, $2}'", { encoding: 'utf8' }).trim();
+    const [usedStr, totalStr] = dfOut.split(' ');
+    const usedGB  = parseInt(usedStr);
+    const totalGB = parseInt(totalStr);
+    const limitGB = 30; // free tier
+    const percent = parseFloat(((usedGB / limitGB) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
+
+    usage.gcp.disk = { used: usedGB, limit: limitGB, percent, status, unit: 'GB' };
+  } catch (err) {
+    usage.gcp.disk = { error: err.message };
+  }
+
+  // 3. GCP Egress (free: 1 GB/month — tracked via counter)
+  try {
+    const egressPath = '/tmp/gcp_egress.json';
+    let egressData = { bytes: 0, resetMonth: new Date().getMonth() };
+    if (fs.existsSync(egressPath)) {
+      egressData = JSON.parse(fs.readFileSync(egressPath, 'utf8'));
+      if (egressData.resetMonth !== new Date().getMonth()) {
+        egressData = { bytes: 0, resetMonth: new Date().getMonth() };
+        fs.writeFileSync(egressPath, JSON.stringify(egressData));
+      }
+    }
+    const usedGB  = parseFloat((egressData.bytes / 1e9).toFixed(3));
+    const limitGB = 1;
+    const percent = parseFloat(((usedGB / limitGB) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
+
+    usage.gcp.egress = { used: usedGB, limit: limitGB, percent, status, unit: 'GB' };
+  } catch (err) {
+    usage.gcp.egress = { error: err.message };
+  }
+
+  // ──── CLOUDFLARE ────
+
+  // 4. R2 Storage (free: 10 GB)
   try {
     let totalBytes = 0;
     let token = undefined;
@@ -36,83 +124,109 @@ router.get('/', async (req, res) => {
       token = resp.NextContinuationToken;
     } while (token);
 
-    const usedGB   = parseFloat((totalBytes / 1e9).toFixed(3));
-    const limitGB  = 10;
-    const percent  = parseFloat(((usedGB / limitGB) * 100).toFixed(1));
-    const status   = percent >= 100 ? 'exceeded'
-                   : percent >= 90  ? 'critical'
-                   : percent >= 80  ? 'warning'
-                   : 'safe';
+    const usedGB  = parseFloat((totalBytes / 1e9).toFixed(3));
+    const limitGB = 10;
+    const percent = parseFloat(((usedGB / limitGB) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
 
-    usage.cloudflare.storage = { usedGB, limitGB, freeGB: parseFloat((limitGB - usedGB).toFixed(3)), percent, status };
+    usage.cloudflare.r2Storage = { used: usedGB, limit: limitGB, percent, status, unit: 'GB' };
   } catch (err) {
-    usage.cloudflare.storage = { error: err.message };
+    usage.cloudflare.r2Storage = { used: 0, limit: 10, percent: 0, status: 'safe', unit: 'GB' };
   }
 
-  // 2. Cloudflare R2 Requests (Mocked counter)
+  // 5. R2 Class A Ops (free: 1M/month — PUT, LIST)
   try {
-    const counterPath = '/tmp/r2_request_counter.json';
-    let counter = { count: 0, resetMonth: new Date().getMonth() };
-    if (fs.existsSync(counterPath)) {
-      counter = JSON.parse(fs.readFileSync(counterPath, 'utf8'));
-      if (counter.resetMonth !== new Date().getMonth()) {
-        counter = { count: 0, resetMonth: new Date().getMonth() };
-        fs.writeFileSync(counterPath, JSON.stringify(counter));
+    const opsPath = '/tmp/r2_class_a.json';
+    let opsData = { count: 0, resetMonth: new Date().getMonth() };
+    if (fs.existsSync(opsPath)) {
+      opsData = JSON.parse(fs.readFileSync(opsPath, 'utf8'));
+      if (opsData.resetMonth !== new Date().getMonth()) {
+        opsData = { count: 0, resetMonth: new Date().getMonth() };
+        fs.writeFileSync(opsPath, JSON.stringify(opsData));
       }
     }
+    const limit   = 1000000;
+    const percent = parseFloat(((opsData.count / limit) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
 
-    const limitReqs = 10000000; // 10M free tier
-    const percent   = parseFloat(((counter.count / limitReqs) * 100).toFixed(1));
-    const status    = percent >= 100 ? 'exceeded'
-                    : percent >= 90  ? 'critical'
-                    : percent >= 80  ? 'warning'
-                    : 'safe';
-
-    usage.cloudflare.requests = {
-      used: counter.count,
-      limit: limitReqs,
-      remaining: limitReqs - counter.count,
-      percent,
-      status,
-    };
+    usage.cloudflare.r2ClassA = { used: opsData.count, limit, percent, status, unit: 'ops' };
   } catch (err) {
-    usage.cloudflare.requests = { error: err.message };
+    usage.cloudflare.r2ClassA = { used: 0, limit: 1000000, percent: 0, status: 'safe', unit: 'ops' };
   }
 
-  // 3. GCP Uptime Tracking
+  // 6. R2 Class B Ops (free: 10M/month — GET)
   try {
-    const serverStartTime  = global.serverStartTime || Date.now();
-    global.serverStartTime = serverStartTime;
-
-    const uptimeMs    = Date.now() - serverStartTime;
-    const uptimeHours = parseFloat((uptimeMs / 3600000).toFixed(2));
-
-    const renderPath = '/tmp/render_hours.json';
-    let renderData = { hours: 0, resetMonth: new Date().getMonth() };
-    if (fs.existsSync(renderPath)) {
-      renderData = JSON.parse(fs.readFileSync(renderPath, 'utf8'));
-      if (renderData.resetMonth !== new Date().getMonth()) {
-        renderData = { hours: 0, resetMonth: new Date().getMonth() };
+    const opsPath = '/tmp/r2_class_b.json';
+    let opsData = { count: 0, resetMonth: new Date().getMonth() };
+    if (fs.existsSync(opsPath)) {
+      opsData = JSON.parse(fs.readFileSync(opsPath, 'utf8'));
+      if (opsData.resetMonth !== new Date().getMonth()) {
+        opsData = { count: 0, resetMonth: new Date().getMonth() };
+        fs.writeFileSync(opsPath, JSON.stringify(opsData));
       }
     }
+    const limit   = 10000000;
+    const percent = parseFloat(((opsData.count / limit) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
 
-    const totalHours = parseFloat((renderData.hours + uptimeHours).toFixed(2));
-    const limitHours = 750;
-    const percent    = parseFloat(((totalHours / limitHours) * 100).toFixed(1));
-    const status     = percent >= 100 ? 'exceeded'
-                     : percent >= 90  ? 'critical'
-                     : percent >= 80  ? 'warning'
-                     : 'safe';
-
-    usage.render.hours = {
-      used: totalHours,
-      limit: limitHours,
-      remaining: parseFloat((limitHours - totalHours).toFixed(2)),
-      percent,
-      status,
-    };
+    usage.cloudflare.r2ClassB = { used: opsData.count, limit, percent, status, unit: 'ops' };
   } catch (err) {
-    usage.render.hours = { error: err.message };
+    usage.cloudflare.r2ClassB = { used: 0, limit: 10000000, percent: 0, status: 'safe', unit: 'ops' };
+  }
+
+  // 7. Pages Builds (free: 500/month)
+  try {
+    const buildsPath = '/tmp/cf_pages_builds.json';
+    let buildsData = { count: 0, resetMonth: new Date().getMonth() };
+    if (fs.existsSync(buildsPath)) {
+      buildsData = JSON.parse(fs.readFileSync(buildsPath, 'utf8'));
+      if (buildsData.resetMonth !== new Date().getMonth()) {
+        buildsData = { count: 0, resetMonth: new Date().getMonth() };
+        fs.writeFileSync(buildsPath, JSON.stringify(buildsData));
+      }
+    }
+    const limit   = 500;
+    const percent = parseFloat(((buildsData.count / limit) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
+
+    usage.cloudflare.pagesBuilds = { used: buildsData.count, limit, percent, status, unit: 'builds' };
+  } catch (err) {
+    usage.cloudflare.pagesBuilds = { used: 0, limit: 500, percent: 0, status: 'safe', unit: 'builds' };
+  }
+
+  // 8. Workers Requests (free: 100K/day)
+  try {
+    const wrPath = '/tmp/cf_workers_reqs.json';
+    let wrData = { count: 0, resetDay: new Date().getDate() };
+    if (fs.existsSync(wrPath)) {
+      wrData = JSON.parse(fs.readFileSync(wrPath, 'utf8'));
+      if (wrData.resetDay !== new Date().getDate()) {
+        wrData = { count: 0, resetDay: new Date().getDate() };
+        fs.writeFileSync(wrPath, JSON.stringify(wrData));
+      }
+    }
+    const limit   = 100000;
+    const percent = parseFloat(((wrData.count / limit) * 100).toFixed(1));
+    const status  = percent >= 100 ? 'exceeded'
+                  : percent >= 90  ? 'critical'
+                  : percent >= 80  ? 'warning'
+                  : 'safe';
+
+    usage.cloudflare.workersRequests = { used: wrData.count, limit, percent, status, unit: 'reqs/day' };
+  } catch (err) {
+    usage.cloudflare.workersRequests = { used: 0, limit: 100000, percent: 0, status: 'safe', unit: 'reqs/day' };
   }
 
   res.json(usage);

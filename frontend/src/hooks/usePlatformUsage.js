@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const WARNED_KEY = 'ts_warned_thresholds'; // localStorage key
+const WARNED_KEY = 'ts_warned_thresholds';
 
 export function usePlatformUsage() {
   const [usage, setUsage]       = useState(null);
@@ -13,50 +13,38 @@ export function usePlatformUsage() {
     const toasts     = [];
 
     const checks = [
-      {
-        key:     'r2_storage',
-        label:   'Cloudflare R2 Storage',
-        icon:    '☁️',
-        percent: data?.cloudflare?.storage?.percent,
-        status:  data?.cloudflare?.storage?.status,
-        detail:  `${data?.cloudflare?.storage?.freeGB} GB remaining`,
-        action:  { label: 'MANAGE R2', href: '/manage-r2' },
-      },
-      {
-        key:     'r2_requests',
-        label:   'Cloudflare R2 Requests',
-        icon:    '☁️',
-        percent: data?.cloudflare?.requests?.percent,
-        status:  data?.cloudflare?.requests?.status,
-        detail:  `${(data?.cloudflare?.requests?.remaining || 0).toLocaleString()} requests remaining this month`,
-        action:  { label: 'VIEW USAGE', href: '/manage-r2' },
-      },
-      {
-        key:     'render_hours',
-        label:   'GCP VM Uptime',
-        icon:    '⚡',
-        percent: data?.render?.hours?.percent,
-        status:  data?.render?.hours?.status,
-        detail:  `${data?.render?.hours?.remaining} hours remaining this month`,
-        action:  { label: 'VIEW USAGE', href: '/settings' },
-      },
+      // GCP
+      { key: 'gcp_vm',     label: 'GCP VM Hours',        data: data?.gcp?.vmHours },
+      { key: 'gcp_disk',   label: 'GCP Disk',            data: data?.gcp?.disk },
+      { key: 'gcp_egress', label: 'GCP Egress',          data: data?.gcp?.egress },
+      // Cloudflare
+      { key: 'cf_r2',      label: 'R2 Storage',          data: data?.cloudflare?.r2Storage },
+      { key: 'cf_r2a',     label: 'R2 Write Ops',        data: data?.cloudflare?.r2ClassA },
+      { key: 'cf_r2b',     label: 'R2 Read Ops',         data: data?.cloudflare?.r2ClassB },
+      { key: 'cf_pages',   label: 'Pages Builds',        data: data?.cloudflare?.pagesBuilds },
+      { key: 'cf_workers', label: 'Workers Requests',    data: data?.cloudflare?.workersRequests },
     ];
 
-    checks.forEach(({ key, label, icon, percent, status, detail, action }) => {
-      if (!percent || status === 'safe') return;
+    checks.forEach(({ key, label, data: metric }) => {
+      if (!metric || metric.error || !metric.percent || metric.status === 'safe') return;
 
-      // Show sticky banner for warning+ states
-      newBanners.push({ key, label, icon, percent, status, detail, action });
+      newBanners.push({
+        key,
+        label,
+        icon: key.startsWith('gcp') ? '☁️' : '🔶',
+        percent: metric.percent,
+        status: metric.status,
+        detail: `${metric.used} / ${metric.limit} ${metric.unit || ''}`,
+      });
 
-      // Fire toast only ONCE per threshold crossing
-      const toastKey = `${key}_${status}`;
+      const toastKey = `${key}_${metric.status}`;
       if (!warned[toastKey]) {
-        const emoji = status === 'exceeded' ? '🛑' : status === 'critical' ? '🚨' : '⚠️';
+        const emoji = metric.status === 'exceeded' ? '🛑' : metric.status === 'critical' ? '🚨' : '⚠️';
         toasts.push({
           id: toastKey,
-          type: status === 'safe' ? 'info' : status,
-          message: `${emoji} ${label} at ${Math.round(percent)}% — ${detail}`,
-          autoDismiss: status === 'exceeded' ? false : status === 'critical' ? 12000 : 8000,
+          type: metric.status === 'safe' ? 'info' : metric.status,
+          message: `${emoji} ${label} at ${Math.round(metric.percent)}%`,
+          autoDismiss: metric.status === 'exceeded' ? false : metric.status === 'critical' ? 12000 : 8000,
         });
         warned[toastKey] = true;
       }
@@ -80,7 +68,7 @@ export function usePlatformUsage() {
 
   useEffect(() => {
     fetchUsage();
-    const interval = setInterval(fetchUsage, 60_000); // every 60s
+    const interval = setInterval(fetchUsage, 60_000);
     return () => clearInterval(interval);
   }, [fetchUsage]);
 
