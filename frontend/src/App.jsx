@@ -194,7 +194,7 @@ export default function App() {
             />
             <Route 
               path="/files/:torrentId" 
-              element={<FileBrowserView torrents={torrents} isAdmin={isAdmin} />} 
+              element={<FileBrowserView torrents={torrents} isAdmin={isAdmin} onRemoveTorrent={handleRemoveTorrent} />} 
             />
 
             <Route 

@@ -91,7 +91,17 @@ export default function FileBrowserView({ torrents, isAdmin }) {
           onClose={() => setPlayer({ fileIndex: null, fileName: '' })}
         />
       ) : (
-        <FileBrowser torrent={torrent} onPlay={handlePlay} isAdmin={isAdmin} />
+        <FileBrowser 
+          torrent={torrent} 
+          onPlay={handlePlay} 
+          isAdmin={isAdmin} 
+          onRemove={(id) => {
+            if (onRemoveTorrent) {
+              onRemoveTorrent(id);
+              navigate('/');
+            }
+          }}
+        />
       )}
     </div>
   );

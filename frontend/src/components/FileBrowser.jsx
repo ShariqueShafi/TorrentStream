@@ -21,7 +21,7 @@ const getFileIcon = (category) => {
   }
 };
 
-export default function FileBrowser({ torrent, onPlay, isAdmin }) {
+export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
   if (!torrent) return null;
 
   // Use totalSize (API field); fall back to length for safety
@@ -60,6 +60,20 @@ export default function FileBrowser({ torrent, onPlay, isAdmin }) {
                 FETCHING METADATA
               </div>
             )}
+            {isAdmin && onRemove && (
+              <button
+                className="bg-white text-status-error font-bold px-md py-sm flex items-center gap-sm border-2 border-border-primary neubrutal-shadow neubrutal-hover neubrutal-active ml-auto sm:ml-0"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to remove this torrent?')) {
+                    onRemove(torrent.id);
+                  }
+                }}
+                title="Remove Torrent"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <span className="hidden sm:inline">REMOVE</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -82,6 +96,21 @@ export default function FileBrowser({ torrent, onPlay, isAdmin }) {
                 />
               ))}
             </div>
+            {isAdmin && onRemove && (
+              <div className="mt-xl flex justify-center">
+                <button
+                  onClick={() => {
+                    if (window.confirm('Cancel and remove this stuck torrent?')) {
+                      onRemove(torrent.id);
+                    }
+                  }}
+                  className="bg-white text-status-error font-bold px-xl py-md flex items-center justify-center gap-sm border-2 border-border-primary shadow-[4px_4px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#1A1A1A] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all"
+                >
+                  <span className="material-symbols-outlined">delete_forever</span>
+                  <span>CANCEL & REMOVE</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           torrent.files.map((file) => {
