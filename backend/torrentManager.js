@@ -95,8 +95,10 @@ export function addTorrent(magnetOrUrl) {
     try {
       const torrent = client.add(magnetOrUrl, { path: TORRENT_PATH });
       
-      // Store it immediately so listTorrents can see it
-      activeTorrents.set(torrent.infoHash, torrent);
+      // We must wait for the infoHash to be populated, otherwise it gets keyed as `undefined`!
+      torrent.on('infoHash', () => {
+        activeTorrents.set(torrent.infoHash, torrent);
+      });
       
       // Deselect files when it eventually becomes ready
       torrent.on('ready', () => {
@@ -105,7 +107,16 @@ export function addTorrent(magnetOrUrl) {
       });
 
       // Resolve immediately, don't wait for metadata (prevents Cloudflare 522 timeouts)
-      resolve(formatTorrentInfo(torrent));
+      resolve({
+        id: torrent.infoHash || magnetOrUrl.match(/xt=urn:btih:([a-zA-Z0-9]+)/i)?.[1]?.toLowerCase() || 'pending',
+        name: 'Pending Metadata...',
+        totalSize: 0,
+        downloaded: 0,
+        uploaded: 0,
+        progress: 0,
+        ready: false,
+        files: []
+      });
 
     } catch (err) {
       // WebTorrent throws synchronously if a duplicate infoHash is added
