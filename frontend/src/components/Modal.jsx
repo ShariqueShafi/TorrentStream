@@ -9,7 +9,7 @@ export default function Modal({ isOpen, onClose, title, children, icon, actionLa
         className="absolute inset-0" 
         onClick={onClose}
       />
-      <div className="relative bg-surface dark:bg-background border-4 border-border-primary w-full max-w-[450px] p-lg shadow-[8px_8px_0px_#1A1A1A] animate-in fade-in zoom-in duration-200">
+      <div className="relative bg-surface dark:bg-background border-4 border-border-primary w-full max-w-[450px] p-lg shadow-[8px_8px_0px_#1A1A1A] modal-animate">
         <div className="flex justify-between items-center mb-lg">
           <h2 className="font-page-title text-page-title uppercase tracking-tighter flex items-center gap-2">
             {icon && <span className="material-symbols-outlined text-primary">{icon}</span>}

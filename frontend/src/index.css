@@ -7,7 +7,8 @@
         @apply fixed bottom-lg right-lg z-[200] flex flex-col gap-md max-w-sm w-full;
     }
     .toast {
-        @apply flex items-center gap-md p-md border-2 border-border-primary neubrutal-shadow animate-in slide-in-from-right duration-300 bg-white text-text-primary font-metadata text-metadata uppercase font-bold tracking-tight leading-tight;
+        @apply flex items-center gap-md p-md border-2 border-border-primary neubrutal-shadow bg-white text-text-primary font-metadata text-metadata uppercase font-bold tracking-tight leading-tight;
+        animation: slideInRight 0.3s ease-out;
     }
     .toast-success {
         @apply bg-status-success text-on-primary;
@@ -43,3 +44,16 @@ body {
     background-color: theme("colors.bg-page");
 }
 
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes modalIn {
+    from { transform: scale(0.92); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+
+.modal-animate {
+    animation: modalIn 0.2s ease-out;
+}

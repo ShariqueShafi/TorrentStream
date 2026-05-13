@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Topbar from './components/Topbar';
 import Sidebar from './components/Sidebar';
@@ -24,7 +24,6 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('ts_admin') === '1');
-  const pollRef = useRef(null);
 
   const { usage, banners, newToasts, dismissBanner, refetch } = usePlatformUsage();
 
@@ -88,20 +87,29 @@ export default function App() {
     }
   }, [newToasts]);
 
-  // Poll for torrent list every 3 seconds
+  // Adaptive poll: 2s when any torrent is missing file metadata, 4s when all settled
   useEffect(() => {
+    let timeoutId = null;
+
     const poll = async () => {
       try {
         const data = await listTorrents();
-        setTorrents(data.torrents || []);
+        const list = data.torrents || [];
+        setTorrents(list);
         setGlobalStats(data.stats || null);
+
+        // If any torrent still has no files, poll faster
+        const anyPending = list.some((t) => !t.files || t.files.length === 0);
+        const delay = anyPending ? 2000 : 4000;
+        timeoutId = setTimeout(poll, delay);
       } catch {
-        // silent fail for polling
+        // silent fail — retry at normal rate
+        timeoutId = setTimeout(poll, 4000);
       }
     };
+
     poll();
-    pollRef.current = setInterval(poll, 3000);
-    return () => clearInterval(pollRef.current);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const handleAddTorrent = async (input) => {
