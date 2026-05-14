@@ -36,7 +36,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
         <div className="relative z-10">
           <div className="flex flex-wrap items-center justify-between gap-md">
             <div className="flex flex-col gap-xs">
-              <h1 className="font-page-title text-[32px] font-extrabold uppercase leading-none tracking-tighter">
+              <h1 className="font-page-title text-2xl md:text-3xl font-extrabold uppercase leading-tight tracking-tighter">
                 {torrent.name || 'Unnamed Torrent'}
               </h1>
               <div className="flex items-center gap-md font-metadata text-metadata text-surface-variant">
@@ -49,13 +49,8 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                 )}
               </div>
             </div>
-            {torrent.ready ? (
-              <div className="bg-status-success text-on-primary font-label-caps text-label-caps px-md py-sm border-2 border-on-primary flex items-center gap-sm">
-                <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>cloud_done</span>
-                READY ON R2
-              </div>
-            ) : (
-              <div className="bg-primary-fixed text-on-background font-label-caps text-label-caps px-md py-sm border-2 border-border-primary flex items-center gap-sm animate-pulse">
+            {!torrent.ready && (
+              <div className="bg-primary-fixed text-on-background font-label-caps text-label-caps px-md py-sm border-2 border-border-primary flex items-center gap-sm animate-pulse ml-auto sm:ml-0">
                 <span className="material-symbols-outlined text-[16px] animate-spin">refresh</span>
                 FETCHING METADATA
               </div>
@@ -139,19 +134,19 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                     download={torrent.ready ? file.name : undefined}
                     target={torrent.ready ? '_blank' : '_self'}
                     rel="noreferrer"
-                    className={`bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
+                    className={`bg-white border-2 border-border-primary px-lg py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
                       !torrent.ready
                         ? 'opacity-50 cursor-not-allowed'
                         : 'hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none'
                     }`}
                     onClick={(e) => !torrent.ready && e.preventDefault()}
                   >
-                    <span className="material-symbols-outlined text-[14px]">download</span>
-                    {torrent.ready ? 'DL' : 'WAIT...'}
+                    <span className="material-symbols-outlined text-[16px]">download</span>
+                    {torrent.ready ? 'DOWNLOAD' : 'WAIT...'}
                   </a>
                   {isAdmin && onRemove && (
                     <button
-                      className="bg-white text-status-error border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+                      className="bg-white text-status-error border-2 border-border-primary p-sm flex items-center justify-center shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all w-[42px] h-[42px] shrink-0"
                       onClick={() => {
                         if (window.confirm('Are you sure you want to remove this file/torrent?')) {
                           onRemove(torrent.id);
@@ -159,8 +154,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                       }}
                       title="Remove File"
                     >
-                      <span className="material-symbols-outlined text-[14px]">delete</span>
-                      REMOVE
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
                     </button>
                   )}
                 </div>
