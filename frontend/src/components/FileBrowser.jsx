@@ -60,20 +60,6 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                 FETCHING METADATA
               </div>
             )}
-            {isAdmin && onRemove && (
-              <button
-                className="bg-white text-status-error font-bold px-md py-sm flex items-center gap-sm border-2 border-border-primary neubrutal-shadow neubrutal-hover neubrutal-active ml-auto sm:ml-0"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to remove this torrent?')) {
-                    onRemove(torrent.id);
-                  }
-                }}
-                title="Remove Torrent"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-                <span className="hidden sm:inline">REMOVE</span>
-              </button>
-            )}
           </div>
         </div>
       </section>
@@ -145,7 +131,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                       disabled={!torrent.ready}
                     >
                       <span className="material-symbols-outlined text-[14px]">play_arrow</span>
-                      {torrent.ready ? '▶ STREAM' : 'WAIT...'}
+                      {torrent.ready ? 'STREAM' : 'WAIT...'}
                     </button>
                   )}
                   <a
@@ -161,8 +147,22 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                     onClick={(e) => !torrent.ready && e.preventDefault()}
                   >
                     <span className="material-symbols-outlined text-[14px]">download</span>
-                    {torrent.ready ? '↓ DL' : 'WAIT...'}
+                    {torrent.ready ? 'DL' : 'WAIT...'}
                   </a>
+                  {isAdmin && onRemove && (
+                    <button
+                      className="bg-white text-status-error border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to remove this file/torrent?')) {
+                          onRemove(torrent.id);
+                        }
+                      }}
+                      title="Remove File"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">delete</span>
+                      REMOVE
+                    </button>
+                  )}
                 </div>
               </div>
             );
