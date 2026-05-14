@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { getDownloadUrl } from '../api';
+import Modal from './Modal';
 
 const formatSize = (bytes) => {
   if (bytes === undefined || bytes === null || isNaN(bytes)) return '—';
@@ -22,6 +23,8 @@ const getFileIcon = (category) => {
 };
 
 export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   if (!torrent) return null;
 
   // Use totalSize (API field); fall back to length for safety
@@ -147,11 +150,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                   {isAdmin && onRemove && (
                     <button
                       className="bg-white text-status-error border-2 border-border-primary p-sm flex items-center justify-center shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all w-[42px] h-[42px] shrink-0"
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to remove this file/torrent?')) {
-                          onRemove(torrent.id);
-                        }
-                      }}
+                      onClick={() => setDeleteTarget(file)}
                       title="Remove File"
                     >
                       <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -163,6 +162,29 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
           })
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Remove Torrent"
+        icon="delete_forever"
+        actionLabel="Remove"
+        actionVariant="danger"
+        onAction={() => {
+          if (deleteTarget) {
+            onRemove(torrent.id);
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <p>
+          Are you sure you want to remove{' '}
+          <strong>{deleteTarget?.name || 'this file'}</strong>?
+          <br />
+          <span className="text-status-error font-bold">This action will remove the entire torrent from R2 storage.</span>
+        </p>
+      </Modal>
     </div>
   );
 }
