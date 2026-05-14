@@ -2,6 +2,7 @@ import WebTorrent from 'webtorrent';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,8 +68,8 @@ function formatFileInfo(file, index) {
 
 export function formatTorrentInfo(torrent) {
   return {
-    id: torrent.infoHash,
-    name: torrent.name,
+    id: torrent.infoHash || torrent.pendingId,
+    name: torrent.name || 'Pending Metadata...',
     totalSize: torrent.length,
     downloaded: torrent.downloaded,
     uploaded: torrent.uploaded,
@@ -95,8 +96,18 @@ export function addTorrent(magnetOrUrl) {
     try {
       const torrent = client.add(magnetOrUrl, { path: TORRENT_PATH });
       
-      // We must wait for the infoHash to be populated, otherwise it gets keyed as `undefined`!
+      const pendingId = torrent.infoHash || magnetOrUrl.match(/xt=urn:btih:([a-zA-Z0-9]+)/i)?.[1]?.toLowerCase() || uuidv4();
+      torrent.pendingId = pendingId;
+
+      if (!torrent.infoHash) {
+        activeTorrents.set(pendingId, torrent);
+      }
+      
+      // We must wait for the infoHash to be populated
       torrent.on('infoHash', () => {
+        if (activeTorrents.has(pendingId) && pendingId !== torrent.infoHash) {
+          activeTorrents.delete(pendingId);
+        }
         activeTorrents.set(torrent.infoHash, torrent);
       });
       
@@ -108,7 +119,7 @@ export function addTorrent(magnetOrUrl) {
 
       // Resolve immediately, don't wait for metadata (prevents Cloudflare 522 timeouts)
       resolve({
-        id: torrent.infoHash || magnetOrUrl.match(/xt=urn:btih:([a-zA-Z0-9]+)/i)?.[1]?.toLowerCase() || 'pending',
+        id: pendingId,
         name: 'Pending Metadata...',
         totalSize: 0,
         downloaded: 0,

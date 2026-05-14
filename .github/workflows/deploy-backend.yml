@@ -1,0 +1,36 @@
+name: Deploy Backend to GCP
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    name: Deploy Backend via SSH
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            # Go to the backend directory on your GCP server
+            # Note: Update this path to match exactly where your project is stored on the server!
+            cd ~/TorrentStream/backend
+            
+            # Pull the latest code
+            git pull origin main
+            
+            # Install any new packages
+            npm install
+            
+            # Restart the Node server with PM2
+            # Note: Update 'torrentstream-backend' if your PM2 process has a different name
+            pm2 restart torrentstream-backend || pm2 start server.js --name torrentstream-backend

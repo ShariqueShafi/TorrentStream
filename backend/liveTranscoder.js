@@ -30,7 +30,9 @@ export function liveTranscode(inputStream, outputDir, onProgress = () => {}) {
 
     const args = [
       '-i', 'pipe:0',                    // Read from stdin
-      '-c:v', 'copy',                    // Copy video codec (no re-encode)
+      '-c:v', 'libx264',                 // Transcode video to H264 for universal browser compatibility
+      '-preset', 'ultrafast',            // Fast transcoding
+      '-crf', '28',                      // Reasonable quality vs bitrate tradeoff
       '-c:a', 'aac',                     // Transcode audio to AAC
       '-b:a', '128k',                    // Audio bitrate
       '-f', 'hls',                       // Output format: HLS
