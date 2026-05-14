@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import FileBrowser from '../components/FileBrowser';
-import HLSPlayer from '../components/HLSPlayer';
+import VideoPlayer from '../components/VideoPlayer';
 import { getTorrent } from '../api';
 
 export default function FileBrowserView({ torrents, isAdmin }) {
@@ -84,7 +84,7 @@ export default function FileBrowserView({ torrents, isAdmin }) {
       </nav>
 
       {player.fileIndex !== null ? (
-        <HLSPlayer
+        <VideoPlayer
           torrentId={torrent.id}
           fileIndex={player.fileIndex}
           fileName={player.fileName}

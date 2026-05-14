@@ -148,6 +148,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                   )}
                   <a
                     href={torrent.ready ? getDownloadUrl(torrent.id, file.index) : '#'}
+                    download={torrent.ready ? file.name : undefined}
                     target={torrent.ready ? '_blank' : '_self'}
                     rel="noreferrer"
                     className={`bg-white border-2 border-border-primary px-md py-sm font-label-caps text-label-caps flex items-center gap-sm shadow-[3px_3px_0px_#1A1A1A] transition-all ${
