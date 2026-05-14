@@ -186,3 +186,43 @@ export function getClientStats() {
     totalRatio: client.ratio,
   };
 }
+
+// ==========================================
+// BACKGROUND MAINTENANCE: AUTO-CLEAR STORAGE
+// ==========================================
+// Automatically runs every 1 hour to clean up orphaned temporary files
+// from the server's disk, freeing up storage capacity.
+setInterval(() => {
+  try {
+    console.log('[Maintenance] Running automated storage cleanup...');
+    const activePaths = new Set();
+    
+    // Collect all top-level file/folder names currently used by active torrents
+    for (const [, torrent] of activeTorrents) {
+      if (torrent.name) activePaths.add(torrent.name);
+      if (torrent.files) {
+        torrent.files.forEach(f => {
+          const topLevelName = f.path.split(path.sep)[0];
+          activePaths.add(topLevelName);
+        });
+      }
+    }
+
+    // Scan the torrents directory
+    const items = fs.readdirSync(TORRENT_PATH);
+    let deletedCount = 0;
+
+    for (const item of items) {
+      if (!activePaths.has(item)) {
+        const itemPath = path.join(TORRENT_PATH, item);
+        fs.rmSync(itemPath, { recursive: true, force: true });
+        deletedCount++;
+        console.log(`[Maintenance] Auto-cleared orphaned data: ${item}`);
+      }
+    }
+    
+    console.log(`[Maintenance] Cleanup complete. Removed ${deletedCount} orphaned items.`);
+  } catch (err) {
+    console.error('[Maintenance] Error during storage cleanup:', err);
+  }
+}, 60 * 60 * 1000); // 1 hour

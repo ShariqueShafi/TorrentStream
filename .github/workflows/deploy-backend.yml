@@ -33,5 +33,5 @@ jobs:
             npm install
             
             # Restart the Node server with PM2
-            # Note: Update 'torrentstream-backend' if your PM2 process has a different name
-            pm2 restart torrentstream-backend || pm2 start server.js --name torrentstream-backend
+            pm2 delete torrentstream-backend || true
+            pm2 start server.js --name torrentstream-backend --max-memory-restart 800M

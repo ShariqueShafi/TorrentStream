@@ -10,6 +10,7 @@ import downloadRoutes from './routes/download.js';
 import usageRoutes from './routes/usage.js';
 import { initTempStorage, startCleanupSweep, getHLSDir } from './tempStorage.js';
 import { generateToken, authenticateToken } from './auth.js';
+import './cloudflareCleaner.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
