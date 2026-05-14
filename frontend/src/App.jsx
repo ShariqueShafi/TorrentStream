@@ -94,7 +94,7 @@ export default function App() {
     const poll = async () => {
       try {
         const data = await listTorrents();
-        const list = data.torrents || [];
+        const list = (data.torrents || []).reverse();
         setTorrents(list);
         setGlobalStats(data.stats || null);
 

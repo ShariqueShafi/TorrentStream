@@ -85,7 +85,7 @@ export default function FileBrowserView({ torrents, isAdmin }) {
 
       {player.fileIndex !== null ? (
         <VideoPlayer
-          torrentId={torrent.id}
+          torrent={torrent}
           fileIndex={player.fileIndex}
           fileName={player.fileName}
           onClose={() => setPlayer({ fileIndex: null, fileName: '' })}

@@ -113,9 +113,11 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
             )}
           </div>
         ) : (
-          torrent.files.map((file) => {
-            const extension = file.name.split('.').pop() || '';
-            return (
+          [...torrent.files]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((file) => {
+              const extension = file.name.split('.').pop() || '';
+              return (
               <div
                 key={file.index}
                 className="group flex flex-wrap items-center gap-md p-md bg-white border-2 border-border-primary shadow-[4px_4px_0px_#1A1A1A] hover:border-l-primary-fixed hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#1A1A1A] transition-all"

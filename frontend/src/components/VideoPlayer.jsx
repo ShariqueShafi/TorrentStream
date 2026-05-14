@@ -3,10 +3,12 @@ import api from '../api';
 
 const API_BASE = api.defaults.baseURL || '';
 
-export default function VideoPlayer({ torrentId, fileIndex, fileName, onClose }) {
+export default function VideoPlayer({ torrent, fileIndex, fileName, onClose }) {
   const [streamUrl, setStreamUrl] = useState(null);
   const [status, setStatus] = useState('processing');
   const [errorMsg, setErrorMsg] = useState('');
+  
+  const torrentId = torrent?.id;
 
   useEffect(() => {
     startStream();
@@ -36,10 +38,12 @@ export default function VideoPlayer({ torrentId, fileIndex, fileName, onClose })
     }
   };
 
+  const subtitles = torrent?.files?.filter(f => f.name.endsWith('.vtt') || f.name.endsWith('.srt')) || [];
+
   return (
     <div className="flex flex-col gap-lg px-lg md:px-xl max-w-7xl mx-auto w-full mb-xl">
       <section className="relative">
-        <div className="aspect-video bg-black border-4 border-border-primary shadow-[8px_8px_0px_#1A1A1A] flex items-center justify-center group overflow-hidden relative">
+        <div className="aspect-video bg-black border-4 border-border-primary flex items-center justify-center group overflow-hidden relative">
           
           {status === 'processing' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 text-white p-lg text-center">
@@ -70,8 +74,20 @@ export default function VideoPlayer({ torrentId, fileIndex, fileName, onClose })
               src={streamUrl}
               controls 
               autoPlay
+              crossOrigin="anonymous"
               className="w-full h-full object-contain z-10"
-            />
+            >
+              {subtitles.map((sub, idx) => (
+                <track 
+                  key={sub.index}
+                  kind="subtitles"
+                  src={`${API_BASE}/download/${torrentId}/${sub.index}`}
+                  srcLang="en"
+                  label={sub.name}
+                  default={idx === 0}
+                />
+              ))}
+            </video>
           )}
 
         </div>
@@ -94,10 +110,11 @@ export default function VideoPlayer({ torrentId, fileIndex, fileName, onClose })
         </div>
         <div className="flex items-center gap-sm shrink-0">
           <button 
-             className="bg-primary-container text-on-primary-fixed border-2 border-border-primary px-lg py-sm font-label-caps text-label-caps shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all"
+             className="bg-primary-container text-on-primary-fixed border-2 border-border-primary px-lg py-sm font-label-caps text-label-caps shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all flex items-center gap-2"
              onClick={onClose}
           >
-            CLOSE PLAYER
+            <span className="material-symbols-outlined text-sm">arrow_back</span>
+            BACK TO FOLDER
           </button>
         </div>
       </div>
