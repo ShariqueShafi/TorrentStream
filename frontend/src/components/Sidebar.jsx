@@ -5,6 +5,7 @@ function UsageBar({ label, data }) {
   if (!data || data.error) return null;
   
   const formatValue = (val, unit) => {
+    if (val === null || val === undefined || isNaN(val)) return '0';
     if (unit === 'ops' || unit === 'reqs/day' || unit === 'builds') {
       if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
       if (val >= 1000) return `${(val / 1000).toFixed(0)}K`;
@@ -14,6 +15,7 @@ function UsageBar({ label, data }) {
   };
 
   const formatLimit = (val, unit) => {
+    if (val === null || val === undefined || isNaN(val)) return '0';
     if (unit === 'ops' || unit === 'reqs/day' || unit === 'builds') {
       if (val >= 1000000) return `${(val / 1000000).toFixed(0)}M`;
       if (val >= 1000) return `${(val / 1000).toFixed(0)}K`;
@@ -26,16 +28,18 @@ function UsageBar({ label, data }) {
     : data.status === 'warning' ? 'bg-status-warning'
     : 'bg-status-error';
 
+  const percent = (data.percent === null || data.percent === undefined || isNaN(data.percent)) ? 0 : data.percent;
+
   return (
     <div className="flex flex-col gap-[2px]">
       <div className="flex justify-between font-metadata text-[9px] uppercase">
         <span className="truncate">{label}</span>
-        <span className="whitespace-nowrap ml-1">{data.percent}%</span>
+        <span className="whitespace-nowrap ml-1">{percent}%</span>
       </div>
       <div className="h-[10px] bg-[#E8E8E8] border border-border-primary relative overflow-hidden">
         <div 
           className={`absolute inset-y-0 left-0 transition-all duration-500 ${barColor}`}
-          style={{ width: `${Math.min(data.percent, 100)}%` }}
+          style={{ width: `${Math.min(percent, 100)}%` }}
         />
       </div>
       <div className="text-[8px] font-metadata text-text-secondary text-right">

@@ -69,10 +69,19 @@ router.get('/', async (req, res) => {
 
   // 2. GCP Disk Usage (free: 30 GB standard persistent disk)
   try {
-    const dfOut = execSync("df -BG / | tail -1 | awk '{print $3, $2}'", { encoding: 'utf8' }).trim();
+    let dfCmd = "df -BG / | tail -1 | awk '{print $3, $2}'";
+    if (process.platform === 'darwin') {
+      dfCmd = "df -g / | tail -1 | awk '{print $3, $2}'";
+    }
+    const dfOut = execSync(dfCmd, { encoding: 'utf8' }).trim();
     const [usedStr, totalStr] = dfOut.split(' ');
     const usedGB  = parseInt(usedStr);
     const totalGB = parseInt(totalStr);
+    
+    if (isNaN(usedGB) || isNaN(totalGB)) {
+      throw new Error(`Failed to parse disk usage values from output: "${dfOut}"`);
+    }
+
     const limitGB = 30; // free tier
     const percent = parseFloat(((usedGB / limitGB) * 100).toFixed(1));
     const status  = percent >= 100 ? 'exceeded'
