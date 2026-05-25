@@ -29,6 +29,7 @@ startCleanupSweep();
 // CORS: allow the main domain and all subdomains (covers Cloudflare Pages preview deployments)
 const ALLOWED_ORIGINS = [
   /^https?:\/\/([\w-]+\.)?shamstailors\.com$/,
+  /^https?:\/\/([\w-]+\.)?torrentstream\.pages\.dev$/,
 ];
 
 app.use(cors({
