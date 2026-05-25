@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 
 // Storage path for torrent data — uses temp storage only
 const TORRENT_PATH = '/tmp/torrentstream/torrents';
+const STATE_FILE = path.join(__dirname, 'torrents_state.json');
 
 // Ensure storage directory exists
 if (!fs.existsSync(TORRENT_PATH)) {
@@ -17,6 +18,38 @@ if (!fs.existsSync(TORRENT_PATH)) {
 
 // WebTorrent client singleton
 const client = new WebTorrent();
+
+function saveState() {
+  try {
+    const state = [];
+    for (const [hash, entry] of activeTorrents) {
+      if (entry.torrent.magnetURI) {
+        state.push(entry.torrent.magnetURI);
+      } else if (entry.torrent.infoHash) {
+        state.push(entry.torrent.infoHash);
+      }
+    }
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+  } catch (err) {
+    console.error('[TorrentManager] Error saving state:', err);
+  }
+}
+
+// Load state on startup
+function loadState() {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      console.log(`[TorrentManager] Restoring ${state.length} torrents from state file...`);
+      for (const magnet of state) {
+        addTorrent(magnet).catch(err => console.error(`Failed to restore ${magnet}:`, err.message));
+      }
+    }
+  } catch (err) {
+    console.error('[TorrentManager] Error loading state:', err);
+  }
+}
+
 
 // Active torrent registry: infoHash → { torrent, lastAccessed }
 const activeTorrents = new Map();
@@ -114,6 +147,7 @@ export function addTorrent(magnetOrUrl) {
 
       if (!torrent.infoHash) {
         activeTorrents.set(pendingId, { torrent, lastAccessed: Date.now() });
+        saveState();
       }
       
       // Once the infoHash is populated, migrate the registry entry
@@ -123,6 +157,7 @@ export function addTorrent(magnetOrUrl) {
           activeTorrents.delete(pendingId);
         }
         activeTorrents.set(torrent.infoHash, { torrent, lastAccessed: Date.now() });
+        saveState();
       });
       
       // Deselect files when it eventually becomes ready (saves bandwidth)
@@ -190,6 +225,7 @@ export function removeTorrent(infoHash, deleteFiles = true) {
     activeTorrents.delete(infoHash);
     
     torrent._isBeingDestroyed = true;
+    saveState();
 
     // Destroy in background (can hang if metadata is still fetching)
     torrent.destroy({ destroyStore: deleteFiles }, (err) => {
@@ -222,19 +258,8 @@ setInterval(() => {
     console.log('[Maintenance] Running automated storage cleanup...');
     const now = Date.now();
 
-    // --- Step 1: Age-based memory eviction ---
+    // --- Step 1: Age-based eviction is DISABLED by user request ---
     let evictedCount = 0;
-    for (const [hash, entry] of activeTorrents) {
-      const idleMs = now - entry.lastAccessed;
-      if (idleMs > MAX_IDLE_MS) {
-        console.log(`[Maintenance] Evicting idle torrent: ${entry.torrent.name || hash} (idle ${Math.round(idleMs / 86400000)}d)`);
-        activeTorrents.delete(hash);
-        entry.torrent.destroy({ destroyStore: true }, (err) => {
-          if (err) console.error(`[Maintenance] Error evicting ${hash}:`, err);
-        });
-        evictedCount++;
-      }
-    }
 
     // --- Step 2: Orphaned file cleanup ---
     // Collect all known infoHashes and torrent names currently active
@@ -276,3 +301,6 @@ setInterval(() => {
     console.error('[Maintenance] Error during storage cleanup:', err);
   }
 }, 60 * 60 * 1000); // Every 1 hour
+
+// Restore previous torrents on startup
+setTimeout(loadState, 1000);
