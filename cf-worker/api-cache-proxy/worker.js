@@ -69,11 +69,13 @@ export default {
     const pathname = url.pathname;
     const method   = request.method;
 
-    // ── 1. BYPASS: streaming, downloads, auth, mutations ──────────────────────
+    // ── 1. BYPASS: streaming, downloads, auth, mutations, and admin requests ──
     const { bypass, reason } = isBypass(method, pathname);
-    if (bypass) {
+    const isAuthorized = request.headers.has('Authorization');
+    if (bypass || isAuthorized) {
       const originResponse = await fetch(request);
-      return addDebugHeaders(originResponse, `BYPASS (${reason})`, null);
+      const bypassReason = bypass ? reason : 'admin-auth';
+      return addDebugHeaders(originResponse, `BYPASS (${bypassReason})`, null);
     }
 
     // ── 2. HLS SEGMENTS: pass through but force CF edge caching ───────────────
