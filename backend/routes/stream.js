@@ -7,6 +7,7 @@ const router = express.Router();
 /**
  * GET /api/stream/direct/:torrentId/:fileIndex
  * Direct HTTP range stream for native video playback without transcoding.
+ * Supports partial content (Range requests) for seekable playback.
  */
 router.get('/direct/:torrentId/:fileIndex', (req, res) => {
   const { torrentId, fileIndex } = req.params;
@@ -22,11 +23,14 @@ router.get('/direct/:torrentId/:fileIndex', (req, res) => {
     return res.status(404).json({ error: 'File not found.' });
   }
 
-  // Prioritize this file
+  // Prioritize this file for downloading
   file.select();
 
   const mimeType = detectMimeType(file.name);
   
+  // NEVER let Cloudflare cache a streaming response.
+  // CF would try to buffer the entire file before forwarding, killing latency.
+  res.setHeader('Cache-Control', 'no-store, private');
   res.setHeader('Content-Type', mimeType);
   res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -61,32 +65,12 @@ router.get('/direct/:torrentId/:fileIndex', (req, res) => {
 
 /**
  * GET /api/stream/stats
+ * Returns current temp storage stats (active HLS jobs, disk usage).
+ * Cached at CF edge for 10s — low-frequency dashboard data.
  */
 router.get('/stats', (req, res) => {
+  res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=5');
   res.json(getTempStats());
-});
-
-// Mock legacy endpoints to prevent errors during transition
-router.post('/:torrentId/:fileIndex', (req, res) => {
-  const { torrentId, fileIndex } = req.params;
-  res.json({
-    status: 'ready',
-    hlsUrl: `/api/stream/direct/${torrentId}/${fileIndex}`
-  });
-});
-
-router.get('/status/:torrentId/:fileIndex', (req, res) => {
-  const { torrentId, fileIndex } = req.params;
-  res.json({
-    status: 'ready',
-    hlsUrl: `/api/stream/direct/${torrentId}/${fileIndex}`,
-    transcodePercent: 100,
-    transcodeComplete: true
-  });
-});
-
-router.delete('/session/:torrentId/:fileIndex', (req, res) => {
-  res.json({ success: true, message: `Session cleaned up.` });
 });
 
 export default router;

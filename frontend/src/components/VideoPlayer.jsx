@@ -1,56 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
 const API_BASE = api.defaults.baseURL || '';
 
 export default function VideoPlayer({ torrent, fileIndex, fileName, onClose }) {
-  const [streamUrl, setStreamUrl] = useState(null);
-  const [status, setStatus] = useState('processing');
+  const [status, setStatus] = useState('loading');
   const [errorMsg, setErrorMsg] = useState('');
-  
+  const videoRef = useRef(null);
+
   const torrentId = torrent?.id;
 
+  // Build the direct stream URL — no POST needed, the backend serves
+  // HTTP range requests directly at this endpoint.
+  const streamUrl = `${API_BASE}/api/stream/direct/${torrentId}/${fileIndex}`;
+
   useEffect(() => {
-    startStream();
+    setStatus('loading');
+    setErrorMsg('');
   }, [torrentId, fileIndex]);
 
-  const startStream = async () => {
-    setStatus('processing');
-    setErrorMsg('');
-    try {
-      // The backend now returns the direct streaming URL instantly
-      const res = await fetch(`${API_BASE}/api/stream/${torrentId}/${fileIndex}`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || 'Failed to start stream');
+  const subtitles = torrent?.files?.filter(f => f.name.endsWith('.vtt') || f.name.endsWith('.srt')) || [];
 
-      if (data.status === 'ready' && data.hlsUrl) {
-        setStreamUrl(`${API_BASE}${data.hlsUrl}`);
-        setStatus('ready');
-      } else {
-        throw new Error('Unexpected response from server');
-      }
-    } catch (err) {
-      setStatus('error');
-      setErrorMsg(err.message);
-    }
+  const handleVideoCanPlay = () => setStatus('ready');
+  const handleVideoError = (e) => {
+    const code = e.target?.error?.code;
+    const msg = e.target?.error?.message || 'Could not load video stream.';
+    setStatus('error');
+    setErrorMsg(`Media error ${code}: ${msg}`);
   };
 
-  const subtitles = torrent?.files?.filter(f => f.name.endsWith('.vtt') || f.name.endsWith('.srt')) || [];
+  const handleRetry = () => {
+    setStatus('loading');
+    setErrorMsg('');
+    if (videoRef.current) {
+      videoRef.current.load();
+    }
+  };
 
   return (
     <div className="flex flex-col gap-lg px-lg md:px-xl max-w-7xl mx-auto w-full mb-xl">
       <section className="relative">
         <div className="aspect-video bg-black border-4 border-border-primary flex items-center justify-center group overflow-hidden relative">
           
-          {status === 'processing' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 text-white p-lg text-center">
+          {status === 'loading' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 text-white p-lg text-center pointer-events-none">
               <span className="material-symbols-outlined text-4xl animate-spin mb-md" style={{ fontVariationSettings: "'FILL' 1" }}>sync</span>
               <h3 className="font-section-head text-section-head uppercase mb-sm">CONNECTING TO PEERS</h3>
               <p className="font-metadata text-metadata uppercase mt-sm text-white/70">
-                Fetching video stream directly...
+                Buffering stream — playback starts automatically…
               </p>
             </div>
           )}
@@ -61,7 +58,7 @@ export default function VideoPlayer({ torrent, fileIndex, fileName, onClose }) {
               <h3 className="font-section-head text-section-head uppercase mb-sm">STREAM ERROR</h3>
               <p className="font-metadata text-metadata uppercase mb-md text-white/70">{errorMsg}</p>
               <button 
-                onClick={startStream}
+                onClick={handleRetry}
                 className="bg-status-error text-white font-bold px-lg py-sm border-2 border-border-primary neubrutal-shadow neubrutal-hover neubrutal-active"
               >
                 RETRY CONNECTION
@@ -69,27 +66,28 @@ export default function VideoPlayer({ torrent, fileIndex, fileName, onClose }) {
             </div>
           )}
 
-          {status === 'ready' && streamUrl && (
-            <video 
-              src={streamUrl}
-              controls 
-              autoPlay
-              crossOrigin="anonymous"
-              className="w-full h-full object-contain z-10"
-            >
-              {subtitles.map((sub, idx) => (
-                <track 
-                  key={sub.index}
-                  kind="subtitles"
-                  src={`${API_BASE}/download/${torrentId}/${sub.index}`}
-                  srcLang="en"
-                  label={sub.name}
-                  default={idx === 0}
-                />
-              ))}
-            </video>
-          )}
-
+          {/* Video element is always in DOM so the browser can start buffering immediately */}
+          <video
+            ref={videoRef}
+            src={streamUrl}
+            controls
+            autoPlay
+            crossOrigin="anonymous"
+            className="w-full h-full object-contain z-10"
+            onCanPlay={handleVideoCanPlay}
+            onError={handleVideoError}
+          >
+            {subtitles.map((sub, idx) => (
+              <track 
+                key={sub.index}
+                kind="subtitles"
+                src={`${API_BASE}/download/${torrentId}/${sub.index}`}
+                srcLang="en"
+                label={sub.name}
+                default={idx === 0}
+              />
+            ))}
+          </video>
         </div>
       </section>
 

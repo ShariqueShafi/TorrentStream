@@ -4,13 +4,18 @@ import path from 'path';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+// Startup guard — crash early rather than silently failing in production
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is not set. Refusing to start in production.');
+  process.exit(1);
+}
+
 import torrentRoutes from './routes/torrent.js';
 import streamRoutes from './routes/stream.js';
 import downloadRoutes from './routes/download.js';
 import usageRoutes from './routes/usage.js';
-import { initTempStorage, startCleanupSweep, getHLSDir } from './tempStorage.js';
+import { initTempStorage, startCleanupSweep } from './tempStorage.js';
 import { generateToken, authenticateToken } from './auth.js';
-import './cloudflareCleaner.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -18,15 +23,24 @@ const PORT = process.env.PORT || 8080;
 // Initialize temp storage on startup
 initTempStorage();
 
-// Start background cleanup sweep (removes stale sessions every 5min)
+// Start background cleanup sweep (removes stale HLS sessions every 5min)
 startCleanupSweep();
 
-const CORS_ORIGIN = process.env.NODE_ENV === 'production'
-  ? 'https://shamstailors.com'
-  : '*';
+// CORS: allow the main domain and all subdomains (covers Cloudflare Pages preview deployments)
+const ALLOWED_ORIGINS = [
+  /^https?:\/\/([\w-]+\.)?shamstailors\.com$/,
+];
 
 app.use(cors({
-  origin: CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    if (ALLOWED_ORIGINS.some((pattern) => pattern.test(origin))) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS: origin not allowed — ${origin}`));
+  },
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Range', 'Authorization'],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
@@ -38,6 +52,13 @@ app.use((req, res, next) => {
   if (!req.url.startsWith('/hls/') && !req.url.includes('/status/')) {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   }
+  next();
+});
+
+// Secure cache default: every route starts with no-store.
+// Individual routes that are safe to cache will explicitly override this.
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, private');
   next();
 });
 
@@ -53,12 +74,11 @@ app.post('/api/login', (req, res) => {
   res.status(401).json({ error: 'Invalid credentials' });
 });
 
-// Torrent management (Protected for POST and DELETE)
-// We'll apply protection inside the router or here
+// Torrent management (both /api/torrent and /api/torrents for compatibility)
 app.use('/api/torrent', torrentRoutes);
 app.use('/api/torrents', torrentRoutes);
 
-// Stream pipeline (start, status, session cleanup)
+// Stream pipeline (direct range stream + stats)
 app.use('/api/stream', streamRoutes);
 
 // Platform usage stats
@@ -67,23 +87,27 @@ app.use('/api/usage', usageRoutes);
 // Download route (raw file download to user device)
 app.use('/download', downloadRoutes);
 
-// Serve HLS segments as static files
-// The liveTranscoder writes to /tmp/torrentstream/hls/<jobId>/
-// This serves them at /hls/<jobId>/index.m3u8, /hls/<jobId>/seg0001.ts, etc.
+// Serve HLS segments as static files.
+// .ts segments are immutable once written — Cloudflare will cache them at the edge.
+// .m3u8 playlists change as new segments appear — never cache.
 app.use('/hls', express.static('/tmp/torrentstream/hls', {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.m3u8')) {
       res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-      res.setHeader('Cache-Control', 'no-cache, no-store');  // Live playlist changes
+      res.setHeader('Cache-Control', 'no-cache, no-store');
     } else if (filePath.endsWith('.ts')) {
       res.setHeader('Content-Type', 'video/MP2T');
-      res.setHeader('Cache-Control', 'max-age=3600');  // Segments are immutable
+      // public + s-maxage: Cloudflare edge caches segments for 1h.
+      // Segments are content-addressed (seg0001.ts never changes once written).
+      res.setHeader('Cache-Control', 'public, s-maxage=3600, immutable');
     }
   }
 }));
 
-// Health check
+// Health check — safe to cache at CF edge for 30s.
+// Cloudflare will serve cached responses; GCP only gets hit once every 30s.
 app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=10');
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
@@ -103,9 +127,8 @@ app.listen(PORT, () => {
   console.log('  🎬 TorrentStream — Live Streaming');
   console.log(`  ➜ Server:   http://localhost:${PORT}`);
   console.log(`  ➜ API:      http://localhost:${PORT}/api/torrent`);
-  console.log(`  ➜ Stream:   http://localhost:${PORT}/api/stream/:torrentId/:fileIndex`);
+  console.log(`  ➜ Stream:   http://localhost:${PORT}/api/stream/direct/:torrentId/:fileIndex`);
   console.log(`  ➜ Download: http://localhost:${PORT}/download/:torrentId/:fileIndex`);
-  console.log(`  ➜ HLS:      http://localhost:${PORT}/hls/<jobId>/index.m3u8`);
   console.log(`  ➜ Health:   http://localhost:${PORT}/api/health`);
   console.log('');
 });

@@ -151,7 +151,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
                     <button
                       className="bg-white text-status-error border-2 border-border-primary p-sm flex items-center justify-center shadow-[3px_3px_0px_#1A1A1A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_#1A1A1A] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all w-[42px] h-[42px] shrink-0"
                       onClick={() => setDeleteTarget(file)}
-                      title="Remove File"
+                      title="Remove Torrent from Server"
                     >
                       <span className="material-symbols-outlined text-[18px]">delete</span>
                     </button>
@@ -182,7 +182,7 @@ export default function FileBrowser({ torrent, onPlay, isAdmin, onRemove }) {
           Are you sure you want to remove{' '}
           <strong>{deleteTarget?.name || 'this file'}</strong>?
           <br />
-          <span className="text-status-error font-bold">This action will remove the entire torrent from R2 storage.</span>
+          <span className="text-status-error font-bold">This will remove the entire torrent and its data from the server.</span>
         </p>
       </Modal>
     </div>

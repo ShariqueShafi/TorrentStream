@@ -4,7 +4,7 @@ import FileBrowser from '../components/FileBrowser';
 import VideoPlayer from '../components/VideoPlayer';
 import { getTorrent } from '../api';
 
-export default function FileBrowserView({ torrents, isAdmin }) {
+export default function FileBrowserView({ torrents, isAdmin, onRemoveTorrent }) {
   const { torrentId } = useParams();
   const navigate = useNavigate();
   const [player, setPlayer] = useState({ fileIndex: null, fileName: '' });
@@ -28,12 +28,11 @@ export default function FileBrowserView({ torrents, isAdmin }) {
     fetchTorrent();
 
     // Poll every 2 seconds while files are empty (metadata not yet arrived)
-    // Stop once files are populated or the torrent is ready
+    // Stops automatically once files are populated
     pollIntervalRef.current = setInterval(() => {
       getTorrent(torrentId)
         .then((data) => {
           setLocalTorrent(data);
-          // Stop polling once we have files
           if (data && data.files && data.files.length > 0) {
             clearInterval(pollIntervalRef.current);
           }
@@ -44,7 +43,7 @@ export default function FileBrowserView({ torrents, isAdmin }) {
     return () => clearInterval(pollIntervalRef.current);
   }, [torrentId]);
 
-  // Stop the local poll once the global state has files (App.jsx polls every 3s)
+  // Stop the local poll once global state has files (App.jsx polls every 3-4s)
   useEffect(() => {
     if (!needsPolling) {
       clearInterval(pollIntervalRef.current);
@@ -68,6 +67,13 @@ export default function FileBrowserView({ torrents, isAdmin }) {
 
   const handlePlay = (tId, fileIndex, fileName) => {
     setPlayer({ fileIndex, fileName });
+  };
+
+  const handleRemove = (id) => {
+    if (onRemoveTorrent) {
+      onRemoveTorrent(id);
+      navigate('/');
+    }
   };
 
   return (
@@ -95,12 +101,7 @@ export default function FileBrowserView({ torrents, isAdmin }) {
           torrent={torrent} 
           onPlay={handlePlay} 
           isAdmin={isAdmin} 
-          onRemove={(id) => {
-            if (onRemoveTorrent) {
-              onRemoveTorrent(id);
-              navigate('/');
-            }
-          }}
+          onRemove={handleRemove}
         />
       )}
     </div>

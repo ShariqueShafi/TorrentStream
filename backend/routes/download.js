@@ -27,8 +27,10 @@ router.get('/:torrentId/:fileIndex', (req, res) => {
   // 3. Select the file to prioritize downloading
   file.select();
 
-  // 4. Set response headers for browser download
+  // 4. Set response headers for browser download.
+  // NEVER cache downloads at CF \u2014 CF would buffer the whole file before forwarding.
   const mimeType = detectMimeType(file.name);
+  res.setHeader('Cache-Control', 'no-store, private');
   const sanitizedName = file.name.replace(/[^\w\s.\-()[\]]/g, '_');
 
   res.setHeader('Content-Type', mimeType);

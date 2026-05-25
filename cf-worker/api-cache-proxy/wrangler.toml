@@ -1,0 +1,24 @@
+name            = "torrentstream-api-proxy"
+main            = "worker.js"
+compatibility_date = "2026-05-25"
+
+# This worker intercepts ALL requests on api.shamstailors.com
+# and acts as a smart caching layer in front of the GCP backend.
+#
+# Prerequisites:
+#   1. api.shamstailors.com must have the orange cloud enabled in CF DNS
+#      (it must be proxied through Cloudflare, not grey-cloud/DNS-only)
+#   2. Deploy with: npx wrangler deploy
+#
+# After deploy, verify caching is working by checking response headers:
+#   curl -I https://api.shamstailors.com/api/health
+#   → X-Cache: MISS  (first request hits GCP)
+#   curl -I https://api.shamstailors.com/api/health
+#   → X-Cache: HIT   (served from CF edge, GCP not touched)
+
+[[routes]]
+pattern   = "api.shamstailors.com/*"
+zone_name = "shamstailors.com"
+
+[observability]
+enabled = true

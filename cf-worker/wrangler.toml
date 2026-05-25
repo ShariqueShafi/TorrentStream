@@ -1,0 +1,12 @@
+name = "torrentstream-r2-cleaner"
+main = "r2-cleaner.js"
+compatibility_date = "2026-05-25"
+
+# Cron Trigger: runs daily at 3:00 AM UTC
+[triggers]
+crons = ["0 3 * * *"]
+
+# R2 Bucket binding — set bucket_name to your actual bucket
+[[r2_buckets]]
+binding = "TORRENT_BUCKET"
+bucket_name = "torrentstream"

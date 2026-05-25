@@ -18,8 +18,19 @@ if (!fs.existsSync(TORRENT_PATH)) {
 // WebTorrent client singleton
 const client = new WebTorrent();
 
-// Active torrent registry: infoHash -> torrent object
+// Active torrent registry: infoHash → { torrent, lastAccessed }
 const activeTorrents = new Map();
+
+// Age-based eviction: remove torrents inactive for more than 3 days
+const MAX_IDLE_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Touch the last-accessed timestamp for a torrent.
+ */
+function touchTorrent(infoHash) {
+  const entry = activeTorrents.get(infoHash);
+  if (entry) entry.lastAccessed = Date.now();
+}
 
 /**
  * MIME type detection from file extension
@@ -87,8 +98,10 @@ export function formatTorrentInfo(torrent) {
 
 export function addTorrent(magnetOrUrl) {
   return new Promise((resolve, reject) => {
-    for (const [hash, t] of activeTorrents) {
+    for (const [hash, entry] of activeTorrents) {
+      const t = entry.torrent;
       if (t.magnetURI === magnetOrUrl || hash === magnetOrUrl) {
+        touchTorrent(hash);
         return resolve(formatTorrentInfo(t));
       }
     }
@@ -100,24 +113,26 @@ export function addTorrent(magnetOrUrl) {
       torrent.pendingId = pendingId;
 
       if (!torrent.infoHash) {
-        activeTorrents.set(pendingId, torrent);
+        activeTorrents.set(pendingId, { torrent, lastAccessed: Date.now() });
       }
       
-      // We must wait for the infoHash to be populated
+      // Once the infoHash is populated, migrate the registry entry
       torrent.on('infoHash', () => {
         if (activeTorrents.has(pendingId) && pendingId !== torrent.infoHash) {
           activeTorrents.delete(pendingId);
         }
-        activeTorrents.set(torrent.infoHash, torrent);
+        activeTorrents.set(torrent.infoHash, { torrent, lastAccessed: Date.now() });
       });
       
-      // Deselect files when it eventually becomes ready
+      // Deselect files when it eventually becomes ready (saves bandwidth)
       torrent.on('ready', () => {
         torrent.files.forEach((file) => file.deselect());
         console.log(`[TorrentManager] Ready: ${torrent.name} (${torrent.infoHash})`);
+        // Refresh timestamp when metadata arrives
+        touchTorrent(torrent.infoHash);
       });
 
-      // Resolve immediately, don't wait for metadata (prevents Cloudflare 522 timeouts)
+      // Resolve immediately — prevents Cloudflare 522 timeouts while waiting for metadata
       resolve({
         id: pendingId,
         name: 'Pending Metadata...',
@@ -134,9 +149,10 @@ export function addTorrent(magnetOrUrl) {
       if (err.message.includes('duplicate')) {
         const hashMatch = err.message.match(/duplicate torrent ([a-f0-9]+)/i);
         if (hashMatch && hashMatch[1]) {
-           const existing = activeTorrents.get(hashMatch[1]) || client.get(hashMatch[1]);
+           const entry = activeTorrents.get(hashMatch[1]);
+           const existing = entry?.torrent || client.get(hashMatch[1]);
            if (existing) {
-             activeTorrents.set(existing.infoHash, existing);
+             activeTorrents.set(existing.infoHash, { torrent: existing, lastAccessed: Date.now() });
              return resolve(formatTorrentInfo(existing));
            }
         }
@@ -147,28 +163,32 @@ export function addTorrent(magnetOrUrl) {
 }
 
 export function getTorrent(infoHash) {
-  return activeTorrents.get(infoHash) || null;
+  const entry = activeTorrents.get(infoHash);
+  if (!entry) return null;
+  touchTorrent(infoHash);
+  return entry.torrent;
 }
 
 export function listTorrents() {
   const result = [];
-  for (const [, torrent] of activeTorrents) {
-    result.push(formatTorrentInfo(torrent));
+  for (const [, entry] of activeTorrents) {
+    result.push(formatTorrentInfo(entry.torrent));
   }
   return result;
 }
 
 export function removeTorrent(infoHash, deleteFiles = true) {
   return new Promise((resolve, reject) => {
-    const torrent = activeTorrents.get(infoHash);
-    if (!torrent) return reject(new Error('Torrent not found'));
+    const entry = activeTorrents.get(infoHash);
+    if (!entry) return reject(new Error('Torrent not found'));
 
+    const { torrent } = entry;
     const name = torrent.name;
     
-    // Remove from our active registry immediately so UI reflects it
+    // Remove from registry immediately so UI reflects it
     activeTorrents.delete(infoHash);
     
-    // Destroy in background (can hang if metadata is fetching)
+    // Destroy in background (can hang if metadata is still fetching)
     torrent.destroy({ destroyStore: deleteFiles }, (err) => {
       if (err) console.error(`[TorrentManager] Error removing ${infoHash}:`, err);
       else console.log(`[TorrentManager] Removed: ${name} (${infoHash})`);
@@ -190,39 +210,66 @@ export function getClientStats() {
 // ==========================================
 // BACKGROUND MAINTENANCE: AUTO-CLEAR STORAGE
 // ==========================================
-// Automatically runs every 1 hour to clean up orphaned temporary files
-// from the server's disk, freeing up storage capacity.
+// Runs every hour to:
+//  1. Evict torrents that have been idle for > 3 days (age-based eviction)
+//  2. Remove orphaned files in /tmp that no active torrent is using
+//     (matches by infoHash directory name, not just torrent.name)
 setInterval(() => {
   try {
     console.log('[Maintenance] Running automated storage cleanup...');
+    const now = Date.now();
+
+    // --- Step 1: Age-based memory eviction ---
+    let evictedCount = 0;
+    for (const [hash, entry] of activeTorrents) {
+      const idleMs = now - entry.lastAccessed;
+      if (idleMs > MAX_IDLE_MS) {
+        console.log(`[Maintenance] Evicting idle torrent: ${entry.torrent.name || hash} (idle ${Math.round(idleMs / 86400000)}d)`);
+        activeTorrents.delete(hash);
+        entry.torrent.destroy({ destroyStore: true }, (err) => {
+          if (err) console.error(`[Maintenance] Error evicting ${hash}:`, err);
+        });
+        evictedCount++;
+      }
+    }
+
+    // --- Step 2: Orphaned file cleanup ---
+    // Collect all known infoHashes and torrent names currently active
     const activePaths = new Set();
-    
-    // Collect all top-level file/folder names currently used by active torrents
-    for (const [, torrent] of activeTorrents) {
-      if (torrent.name) activePaths.add(torrent.name);
-      if (torrent.files) {
-        torrent.files.forEach(f => {
+    for (const [hash, entry] of activeTorrents) {
+      // Match by infoHash (the directory WebTorrent creates)
+      activePaths.add(hash);
+      if (entry.torrent.name) activePaths.add(entry.torrent.name);
+      if (entry.torrent.files) {
+        entry.torrent.files.forEach(f => {
           const topLevelName = f.path.split(path.sep)[0];
           activePaths.add(topLevelName);
         });
       }
     }
 
-    // Scan the torrents directory
+    // Scan the torrents directory for items not belonging to any active torrent
     const items = fs.readdirSync(TORRENT_PATH);
     let deletedCount = 0;
 
     for (const item of items) {
       if (!activePaths.has(item)) {
         const itemPath = path.join(TORRENT_PATH, item);
-        fs.rmSync(itemPath, { recursive: true, force: true });
-        deletedCount++;
-        console.log(`[Maintenance] Auto-cleared orphaned data: ${item}`);
+        // Only delete items older than 1 hour to avoid touching freshly downloaded files
+        try {
+          const stat = fs.statSync(itemPath);
+          const ageMs = now - stat.mtimeMs;
+          if (ageMs > 60 * 60 * 1000) {
+            fs.rmSync(itemPath, { recursive: true, force: true });
+            deletedCount++;
+            console.log(`[Maintenance] Auto-cleared orphaned data: ${item}`);
+          }
+        } catch { /* skip unreadable items */ }
       }
     }
     
-    console.log(`[Maintenance] Cleanup complete. Removed ${deletedCount} orphaned items.`);
+    console.log(`[Maintenance] Cleanup complete. Evicted ${evictedCount} idle torrents, removed ${deletedCount} orphaned items.`);
   } catch (err) {
     console.error('[Maintenance] Error during storage cleanup:', err);
   }
-}, 60 * 60 * 1000); // 1 hour
+}, 60 * 60 * 1000); // Every 1 hour

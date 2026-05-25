@@ -37,9 +37,16 @@ export default function TorrentList({ torrents, onSelect, onRemove, isAdmin }) {
                     style={{ backgroundImage: 'radial-gradient(#1A1A1A 1px, transparent 1px)', backgroundSize: '10px 10px' }}
                   />
                   <span>🎬</span>
-                  <div className="absolute top-sm right-sm bg-status-success text-on-primary border-2 border-border-primary px-xs py-[2px] font-metadata text-[10px] shadow-[2px_2px_0px_#1A1A1A]">
-                    READY
-                  </div>
+                  {torrent.ready && (
+                    <div className="absolute top-sm right-sm bg-status-success text-on-primary border-2 border-border-primary px-xs py-[2px] font-metadata text-[10px] shadow-[2px_2px_0px_#1A1A1A]">
+                      READY
+                    </div>
+                  )}
+                  {!torrent.ready && (
+                    <div className="absolute top-sm right-sm bg-primary-fixed text-on-background border-2 border-border-primary px-xs py-[2px] font-metadata text-[10px] shadow-[2px_2px_0px_#1A1A1A] animate-pulse">
+                      LOADING
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-md flex flex-col flex-grow">
@@ -117,7 +124,7 @@ export default function TorrentList({ torrents, onSelect, onRemove, isAdmin }) {
       >
         <p>
           Are you sure you want to remove{' '}
-          <strong>{deleteTarget?.name || 'this torrent'}</strong> from R2 storage?
+          <strong>{deleteTarget?.name || 'this torrent'}</strong> from the server?
           <br />
           <span className="text-status-error font-bold">This action cannot be undone.</span>
         </p>
