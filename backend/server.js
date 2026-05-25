@@ -77,6 +77,14 @@ app.use('/api/stream', streamRoutes);
 // Platform usage stats
 app.use('/api/usage', usageRoutes);
 
+app.get('/api/debug-logs', (req, res) => {
+  const { exec } = require('child_process');
+  exec('pm2 logs 0 --lines 100 --nostream', (err, stdout, stderr) => {
+    res.send('<pre>' + stdout + '\n\n' + stderr + '</pre>');
+  });
+});
+
+
 // Download route (raw file download to user device)
 app.use('/download', downloadRoutes);
 
