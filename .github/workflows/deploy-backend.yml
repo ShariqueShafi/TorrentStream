@@ -34,4 +34,5 @@ jobs:
             
             # Restart the Node server with PM2
             pm2 delete torrentstream-backend || true
+            kill -9 $(lsof -t -i:8080) 2>/dev/null || true
             pm2 start server.js --name torrentstream-backend --max-memory-restart 800M

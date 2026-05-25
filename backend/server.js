@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { exec } from 'child_process';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -78,8 +79,7 @@ app.use('/api/stream', streamRoutes);
 app.use('/api/usage', usageRoutes);
 
 app.get('/api/debug-logs', (req, res) => {
-  const { exec } = require('child_process');
-  exec('pm2 logs 0 --lines 100 --nostream', (err, stdout, stderr) => {
+  exec('pm2 logs torrentstream-backend --lines 100 --nostream', (err, stdout, stderr) => {
     res.send('<pre>' + stdout + '\n\n' + stderr + '</pre>');
   });
 });
