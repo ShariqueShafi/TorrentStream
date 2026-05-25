@@ -118,6 +118,7 @@ export function addTorrent(magnetOrUrl) {
       
       // Once the infoHash is populated, migrate the registry entry
       torrent.on('infoHash', () => {
+        if (torrent.destroyed || torrent._isBeingDestroyed) return;
         if (activeTorrents.has(pendingId) && pendingId !== torrent.infoHash) {
           activeTorrents.delete(pendingId);
         }
@@ -188,6 +189,8 @@ export function removeTorrent(infoHash, deleteFiles = true) {
     // Remove from registry immediately so UI reflects it
     activeTorrents.delete(infoHash);
     
+    torrent._isBeingDestroyed = true;
+
     // Destroy in background (can hang if metadata is still fetching)
     torrent.destroy({ destroyStore: deleteFiles }, (err) => {
       if (err) console.error(`[TorrentManager] Error removing ${infoHash}:`, err);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Topbar from './components/Topbar';
 import Sidebar from './components/Sidebar';
@@ -24,6 +24,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('ts_admin') === '1');
+  const lastMutationRef = useRef(0);
 
   const { usage, banners, newToasts, dismissBanner, refetch } = usePlatformUsage();
 
@@ -95,7 +96,10 @@ export default function App() {
       try {
         const data = await listTorrents();
         const list = (data.torrents || []).reverse();
-        setTorrents(list);
+        // Ignore fetched list if we recently mutated local state (cache might be stale)
+        if (Date.now() - lastMutationRef.current > 4000) {
+          setTorrents(list);
+        }
         setGlobalStats(data.stats || null);
 
         // If any torrent still has no files, poll faster
@@ -124,6 +128,7 @@ export default function App() {
           if (exists) return prev.map((t) => (t.id === info.id ? info : t));
           return [...prev, info];
         });
+        lastMutationRef.current = Date.now();
         return { success: true, name: info.name || 'New Torrent' };
       } catch (err) {
         throw new Error(err.response?.data?.error || err.message || 'Could not load torrent');
@@ -134,6 +139,7 @@ export default function App() {
     const failed = results.filter(r => r.status === 'rejected').length;
 
     if (successful > 0) {
+      lastMutationRef.current = Date.now();
       showToast(`${successful} torrents added successfully`, 'success');
     }
     if (failed > 0) {
@@ -146,6 +152,7 @@ export default function App() {
     try {
       await apiRemoveTorrent(id);
       setTorrents((prev) => prev.filter((t) => t.id !== id));
+      lastMutationRef.current = Date.now();
       showToast('Torrent removed', 'info');
     } catch (err) {
       showToast(err.message || 'Failed to remove', 'error');
