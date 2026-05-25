@@ -13,9 +13,9 @@ const router = express.Router();
  * acceptable for free-tier monitoring purposes).
  */
 router.get('/', async (req, res) => {
-  // Cache usage stats at CF edge for 55s \u2014 just under the 60s frontend poll interval.
+  // Cache usage stats at CF edge for 55s — just under the 60s frontend poll interval.
   // Cloudflare absorbs repeated polls; GCP only recomputes disk/uptime once per minute.
-  res.setHeader('Cache-Control', 'public, s-maxage=55, stale-while-revalidate=10');
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=55, stale-while-revalidate=10');
   const usage = {
     gcp: {
       vmHours: null,

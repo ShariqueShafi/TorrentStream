@@ -155,7 +155,14 @@ export default function App() {
       lastMutationRef.current = Date.now();
       showToast('Torrent removed', 'info');
     } catch (err) {
-      showToast(err.message || 'Failed to remove', 'error');
+      if (err.response?.status === 404) {
+        // If the server says it's already gone (404), remove it from local state
+        setTorrents((prev) => prev.filter((t) => t.id !== id));
+        lastMutationRef.current = Date.now();
+        showToast('Torrent removed from view', 'info');
+      } else {
+        showToast(err.message || 'Failed to remove', 'error');
+      }
     }
   };
 

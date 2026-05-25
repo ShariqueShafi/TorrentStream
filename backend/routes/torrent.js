@@ -34,7 +34,7 @@ router.get('/', (req, res) => {
     // Cache at CF edge for 3s — enough to absorb the 2-4s polling loop
     // without becoming stale. stale-while-revalidate lets CF serve the
     // cached copy instantly while fetching fresh data in the background.
-    res.setHeader('Cache-Control', 'public, s-maxage=3, stale-while-revalidate=2');
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3, stale-while-revalidate=2');
     res.json({ torrents, stats });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -46,7 +46,7 @@ router.get('/:id', (req, res) => {
   if (!torrent) return res.status(404).json({ error: 'Torrent not found' });
   try {
     // Individual torrent status is safe to cache for 3s at CF edge.
-    res.setHeader('Cache-Control', 'public, s-maxage=3, stale-while-revalidate=2');
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3, stale-while-revalidate=2');
     res.json(formatTorrentInfo(torrent));
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -108,7 +108,7 @@ app.use('/hls', express.static('/tmp/torrentstream/hls', {
 // Health check — safe to cache at CF edge for 30s.
 // Cloudflare will serve cached responses; GCP only gets hit once every 30s.
 app.get('/api/health', (req, res) => {
-  res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=10');
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=10');
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 

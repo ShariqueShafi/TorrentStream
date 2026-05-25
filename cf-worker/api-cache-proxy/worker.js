@@ -123,7 +123,7 @@ export default {
 
     // Build a cacheable clone with explicit Cache-Control
     const cacheHeaders = new Headers(originResponse.headers);
-    cacheHeaders.set('Cache-Control', `public, s-maxage=${route.ttl}, stale-while-revalidate=${route.swr}`);
+    cacheHeaders.set('Cache-Control', `public, max-age=0, s-maxage=${route.ttl}, stale-while-revalidate=${route.swr}`);
     cacheHeaders.set('X-Cache', 'MISS');
     cacheHeaders.set('X-Cache-Route', route.label);
 
