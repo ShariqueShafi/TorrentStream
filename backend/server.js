@@ -33,15 +33,7 @@ const ALLOWED_ORIGINS = [
 ];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (curl, mobile apps, Postman)
-    if (!origin) return callback(null, true);
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
-    if (ALLOWED_ORIGINS.some((pattern) => pattern.test(origin))) {
-      return callback(null, true);
-    }
-    callback(new Error(`CORS: origin not allowed — ${origin}`));
-  },
+  origin: '*',
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Range', 'Authorization'],
   exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length'],
