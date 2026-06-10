@@ -42,6 +42,13 @@ function loadState() {
       const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
       console.log(`[TorrentManager] Restoring ${state.length} torrents from state file...`);
       for (const magnet of state) {
+        // Extract infoHash from magnet URI to check against destroyed set
+        const hashMatch = magnet.match?.(/xt=urn:btih:([a-zA-Z0-9]+)/i);
+        const hash = hashMatch?.[1]?.toLowerCase();
+        if (hash && isRecentlyDestroyed(hash)) {
+          console.log(`[TorrentManager] Skipping recently-destroyed torrent: ${hash}`);
+          continue;
+        }
         addTorrent(magnet).catch(err => console.error(`Failed to restore ${magnet}:`, err.message));
       }
     }
@@ -53,6 +60,26 @@ function loadState() {
 
 // Active torrent registry: infoHash → { torrent, lastAccessed }
 const activeTorrents = new Map();
+
+// Recently-destroyed hashes — prevents zombie resurrection during loadState
+// or when WebTorrent throws a "duplicate torrent" error for a torrent that
+// is still being torn down. Entries auto-expire after 60 seconds.
+const destroyedHashes = new Map(); // infoHash → destroyedAt timestamp
+const DESTROYED_TTL_MS = 60_000;
+
+function markDestroyed(hash) {
+  destroyedHashes.set(hash, Date.now());
+}
+
+function isRecentlyDestroyed(hash) {
+  const ts = destroyedHashes.get(hash);
+  if (!ts) return false;
+  if (Date.now() - ts > DESTROYED_TTL_MS) {
+    destroyedHashes.delete(hash);
+    return false;
+  }
+  return true;
+}
 
 // Age-based eviction: remove torrents inactive for more than 3 days
 const MAX_IDLE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -139,6 +166,12 @@ export function addTorrent(magnetOrUrl) {
       }
     }
 
+    // Pre-check: if this magnet's hash was recently destroyed, reject early
+    const preHash = magnetOrUrl.match?.(/xt=urn:btih:([a-zA-Z0-9]+)/i)?.[1]?.toLowerCase();
+    if (preHash && isRecentlyDestroyed(preHash)) {
+      return reject(new Error('Torrent was recently removed. Please wait a moment and try again.'));
+    }
+
     try {
       const torrent = client.add(magnetOrUrl, { path: TORRENT_PATH });
       
@@ -153,6 +186,13 @@ export function addTorrent(magnetOrUrl) {
       // Once the infoHash is populated, migrate the registry entry
       torrent.on('infoHash', () => {
         if (torrent.destroyed || torrent._isBeingDestroyed) return;
+        // Guard: don't re-register a torrent that was destroyed between add and infoHash
+        if (isRecentlyDestroyed(torrent.infoHash)) {
+          console.log(`[TorrentManager] Refusing to register recently-destroyed torrent: ${torrent.infoHash}`);
+          torrent.destroy({ destroyStore: true });
+          activeTorrents.delete(pendingId);
+          return;
+        }
         if (activeTorrents.has(pendingId) && pendingId !== torrent.infoHash) {
           activeTorrents.delete(pendingId);
         }
@@ -185,9 +225,14 @@ export function addTorrent(magnetOrUrl) {
       if (err.message.includes('duplicate')) {
         const hashMatch = err.message.match(/duplicate torrent ([a-f0-9]+)/i);
         if (hashMatch && hashMatch[1]) {
-           const entry = activeTorrents.get(hashMatch[1]);
-           const existing = entry?.torrent || client.get(hashMatch[1]);
-           if (existing) {
+           const dupHash = hashMatch[1];
+           // If this torrent is being destroyed, don't resurrect it
+           if (isRecentlyDestroyed(dupHash)) {
+             return reject(new Error('Torrent was recently removed. Please wait a moment and try again.'));
+           }
+           const entry = activeTorrents.get(dupHash);
+           const existing = entry?.torrent || client.get(dupHash);
+           if (existing && !existing._isBeingDestroyed && !existing.destroyed) {
              activeTorrents.set(existing.infoHash, { torrent: existing, lastAccessed: Date.now() });
              return resolve(formatTorrentInfo(existing));
            }
@@ -221,10 +266,14 @@ export function removeTorrent(infoHash, deleteFiles = true) {
     const { torrent } = entry;
     const name = torrent.name;
     
+    // Mark as destroyed BEFORE removing from registry and saving state.
+    // This prevents loadState() and the duplicate error handler from
+    // resurrecting the torrent during the async destroy() callback.
+    markDestroyed(infoHash);
+    torrent._isBeingDestroyed = true;
+
     // Remove from registry immediately so UI reflects it
     activeTorrents.delete(infoHash);
-    
-    torrent._isBeingDestroyed = true;
     saveState();
 
     // Destroy in background (can hang if metadata is still fetching)

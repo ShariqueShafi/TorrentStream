@@ -88,6 +88,13 @@ export default function App() {
     }
   }, [newToasts]);
 
+  // Force an immediate cache-busted poll (used after add/remove mutations)
+  const pollNowRef = useRef(null);
+  const forcePoll = useCallback(() => {
+    // Small delay to let the CF worker purge complete
+    setTimeout(() => { if (pollNowRef.current) pollNowRef.current(); }, 300);
+  }, []);
+
   // Adaptive poll: 2s when any torrent is missing file metadata, 4s when all settled
   useEffect(() => {
     let timeoutId = null;
@@ -97,7 +104,8 @@ export default function App() {
         const data = await listTorrents();
         const list = (data.torrents || []).reverse();
         // Ignore fetched list if we recently mutated local state (cache might be stale)
-        if (Date.now() - lastMutationRef.current > 4000) {
+        // 8s covers CF cache TTL (3s) + SWR (2s) + network jitter
+        if (Date.now() - lastMutationRef.current > 8000) {
           setTorrents(list);
         }
         setGlobalStats(data.stats || null);
@@ -112,8 +120,11 @@ export default function App() {
       }
     };
 
+    // Expose poll function for force-refresh after mutations
+    pollNowRef.current = poll;
+
     poll();
-    return () => clearTimeout(timeoutId);
+    return () => { clearTimeout(timeoutId); pollNowRef.current = null; };
   }, []);
 
   const handleAddTorrent = async (input) => {
@@ -141,6 +152,7 @@ export default function App() {
     if (successful > 0) {
       lastMutationRef.current = Date.now();
       showToast(`${successful} torrents added successfully`, 'success');
+      forcePoll(); // Immediate re-fetch to sync with origin
     }
     if (failed > 0) {
       showToast(`${failed} torrents failed to load`, 'error');
@@ -154,12 +166,14 @@ export default function App() {
       setTorrents((prev) => prev.filter((t) => t.id !== id));
       lastMutationRef.current = Date.now();
       showToast('Torrent removed', 'info');
+      forcePoll(); // Immediate re-fetch to sync with origin
     } catch (err) {
       if (err.response?.status === 404) {
         // If the server says it's already gone (404), remove it from local state
         setTorrents((prev) => prev.filter((t) => t.id !== id));
         lastMutationRef.current = Date.now();
         showToast('Torrent removed from view', 'info');
+        forcePoll();
       } else {
         showToast(err.message || 'Failed to remove', 'error');
       }

@@ -61,6 +61,29 @@ function addDebugHeaders(response, xCache, label) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+// ── Cache purge helper ────────────────────────────────────────────────────────
+// After a mutation (POST/DELETE), purge all torrent-related cache keys so the
+// next poll gets fresh data from origin instead of stale cached results.
+
+async function purgeTorrentCache(url) {
+  const cache = caches.default;
+  const origin = url.origin;
+  const keysToDelete = [
+    new Request(`${origin}/api/torrents`, { method: 'GET' }),
+    new Request(`${origin}/api/torrent`,  { method: 'GET' }),
+  ];
+
+  // Also purge the specific torrent ID if present in the request path
+  // e.g. DELETE /api/torrent/abc123 → purge GET /api/torrent/abc123
+  const idMatch = url.pathname.match(/^\/api\/torrents?\/([a-f0-9]+)/i);
+  if (idMatch) {
+    keysToDelete.push(new Request(`${origin}/api/torrent/${idMatch[1]}`, { method: 'GET' }));
+    keysToDelete.push(new Request(`${origin}/api/torrents/${idMatch[1]}`, { method: 'GET' }));
+  }
+
+  await Promise.all(keysToDelete.map(key => cache.delete(key).catch(() => {})));
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export default {
@@ -69,12 +92,19 @@ export default {
     const pathname = url.pathname;
     const method   = request.method;
 
-    // ── 1. BYPASS: streaming, downloads, auth, mutations, and admin requests ──
+    // ── 1. BYPASS: streaming, downloads, auth, and admin requests ─────────────
     const { bypass, reason } = isBypass(method, pathname);
     const isAuthorized = request.headers.has('Authorization');
     if (bypass || isAuthorized) {
       const originResponse = await fetch(request);
       const bypassReason = bypass ? reason : 'admin-auth';
+
+      // After a successful mutation, purge stale torrent cache entries
+      // so the next GET poll returns fresh data from origin.
+      if (method !== 'GET' && originResponse.ok && pathname.match(/^\/api\/torrents?\b/)) {
+        ctx.waitUntil(purgeTorrentCache(url));
+      }
+
       return addDebugHeaders(originResponse, `BYPASS (${bypassReason})`, null);
     }
 
